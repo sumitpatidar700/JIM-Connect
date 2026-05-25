@@ -1,0 +1,15 @@
+import { useQuery } from '@tanstack/react-query';
+
+import { eventService } from '@/src/services/event-service';
+
+import { queryKeys } from './query-keys';
+
+export function useRegisteredEventsQuery(userId?: string | null) {
+  return useQuery({
+    enabled: Boolean(userId),
+    queryFn: () => eventService.listRegisteredEvents(userId as string),
+    queryKey: queryKeys.registeredEvents(userId),
+    staleTime: 1000 * 10,
+    refetchInterval: 5000,
+  });
+}
