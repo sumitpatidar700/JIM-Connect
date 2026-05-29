@@ -3,106 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - JIM Connect</title>
+    <title>JIM Connect - Campus OS for Jaipuria Indore</title>
     <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-light: #3b82f6;
+            --text-dark: #1f2937;
+            --text-light: #4b5563;
+            --bg-light: #f3f4f6;
+            --white: #ffffff;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: var(--text-dark);
+            background-color: var(--white);
             line-height: 1.6;
-            color: #333;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
+            color: var(--white);
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .header-content {
             max-width: 800px;
             margin: 0 auto;
-            padding: 40px 20px;
-            background-color: #f9f9f9;
         }
-        .container {
-            background-color: #fff;
-            padding: 40px;
+
+        .logo {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 10px;
+        }
+
+        .tagline {
+            font-size: 20px;
+            opacity: 0.9;
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+
+        .cta-btn {
+            display: inline-block;
+            background-color: var(--white);
+            color: var(--primary);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-weight: bold;
+            text-decoration: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .feature-card {
+            padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            background-color: var(--bg-light);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
-        h1 {
-            color: #111;
-            border-bottom: 2px solid #eaeaea;
-            padding-bottom: 10px;
-            font-size: 28px;
-        }
-        h2 {
-            color: #222;
-            margin-top: 30px;
-            border-bottom: 1px solid #eaeaea;
-            padding-bottom: 8px;
+
+        .feature-card h3 {
+            margin-top: 0;
+            color: var(--primary);
             font-size: 20px;
         }
-        p, li {
+
+        .feature-card p {
+            color: var(--text-light);
             font-size: 15px;
-            color: #444;
+            margin-bottom: 0;
         }
-        ul {
-            padding-left: 20px;
+
+        .about-section {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 60px auto;
         }
-        .last-updated {
-            color: #888;
-            font-style: italic;
+
+        .about-section h2 {
+            font-size: 28px;
+            color: var(--primary);
+        }
+
+        .about-section p {
+            font-size: 16px;
+            color: var(--text-light);
+        }
+
+        footer {
+            background-color: #111827;
+            color: #9ca3af;
+            padding: 40px 20px;
+            text-align: center;
             font-size: 14px;
-            margin-bottom: 30px;
+        }
+
+        footer a {
+            color: var(--white);
+            text-decoration: none;
+            margin: 0 10px;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .footer-links {
+            margin-top: 15px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Privacy Policy for JIM Connect</h1>
-        <div class="last-updated">Last Updated: May 29, 2026</div>
 
-        <p>At <strong>JIM Connect</strong> (referred to as "we", "us", or "our"), we respect the privacy of our users. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application (<strong>JIM Connect</strong>).</p>
+    <header>
+        <div class="header-content">
+            <div class="logo">JIM Connect</div>
+            <p class="tagline">The official mobile app and Daily Campus Dashboard for Jaipuria Institute of Management, Indore.</p>
+            <a href="#" class="cta-btn">Download for Android</a>
+        </div>
+    </header>
 
-        <h2>1. Information We Collect</h2>
-        
-        <h3>A. Personal Data</h3>
-        <p>When you register for an account or register for campus events, we collect:</p>
-        <ul>
-            <li><strong>Name:</strong> To display your identity within event lists and leaderboards.</li>
-            <li><strong>College Email Address (@jaipuria.ac.in):</strong> To verify student registration eligibility.</li>
-            <li><strong>Phone Number:</strong> For campus coordinators to contact you regarding events you register for.</li>
-            <li><strong>Profile Picture:</strong> Used to display your avatar for campus registrations, winners, and profile views.</li>
-        </ul>
+    <main>
+        <section class="about-section">
+            <h2>Everything Campus in One Place</h2>
+            <p>JIM Connect brings announcements, upcoming event registrations, winner leaderboards, support systems, and resource repositories straight to your mobile device.</p>
+        </section>
 
-        <h3>B. Device & Usage Info</h3>
-        <ul>
-            <li><strong>Push Notifications (OneSignal):</strong> We collect a unique device token (OneSignal ID) to send you announcements, notice alerts, and event updates.</li>
-            <li><strong>Location Data:</strong> If granted, the app accesses foreground location permissions to show nearby campus location features. You can disable this in settings at any time.</li>
-        </ul>
+        <section class="features">
+            <div class="feature-card">
+                <h3>📢 Quick Notices & Announcements</h3>
+                <p>Stay up to date with real-time official notices from the administration. Get push alerts instantly on your phone.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🎉 Event Registrations</h3>
+                <p>Discover upcoming academic, sports, and cultural events. Register alone or coordinate team registrations easily inside the app.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🏆 Results & Winner Leaderboards</h3>
+                <p>Celebrate victories! Track student accomplishments and event winners directly on the campus trophies screen.</p>
+            </div>
+            <div class="feature-card">
+                <h3>📂 Resources & Archive</h3>
+                <p>Access directories, event details, guides, and document folders on-the-go from the repository screen.</p>
+            </div>
+        </section>
+    </main>
 
-        <h2>2. Use of Your Information</h2>
-        <p>We use the information collected to:</p>
-        <ul>
-            <li>Create and manage your student profile.</li>
-            <li>Track and manage your registrations for campus events.</li>
-            <li>Display winners on the leaderboard directory.</li>
-            <li>Send you notifications about new notices, events, and results.</li>
-            <li>Coordinate team registrations and send invite updates to teammate members.</li>
-        </ul>
+    <footer>
+        <p>&copy; 2026 Jaipuria Institute of Management, Indore. All Rights Reserved.</p>
+        <div class="footer-links">
+            <a href="/privacy.html">Privacy Policy</a>
+            <a href="mailto:support@jaipuria.ac.in">Support Contact</a>
+        </div>
+    </footer>
 
-        <h2>3. Sharing Your Information</h2>
-        <p>We do not sell, rent, or trade your personal data. Your information is shared only as follows:</p>
-        <ul>
-            <li><strong>With Other Students:</strong> If your profile visibility settings are set to public, your name, profile picture, and email/phone will be visible to other students in the Student Directory and Teammate Selection features. You can toggle your profile to private at any time in the app settings.</li>
-            <li><strong>Event Coordinators/Admins:</strong> Staff members can see your registration and contact details to manage events.</li>
-            <li><strong>Service Providers:</strong> We use <strong>Supabase</strong> for database hosting/authentication and <strong>OneSignal</strong> for push notifications.</li>
-        </ul>
-
-        <h2>4. Privacy Control Settings</h2>
-        <ul>
-            <li><strong>Profile Visibility:</strong> You can mark your profile as private in the app settings, which hides your details from other students.</li>
-            <li><strong>Notifications:</strong> You can toggle alerts for announcements and events on/off inside the app settings.</li>
-            <li><strong>Location Access:</strong> You can revoke location access through your device settings.</li>
-        </ul>
-
-        <h2>5. Contact Us</h2>
-        <p>If you have any questions about this Privacy Policy, please contact us at:</p>
-        <ul>
-            <li><strong>Email:</strong> support@jaipuria.ac.in</li>
-            <li><strong>Address:</strong> Jaipuria Institute of Management, Indore, Madhya Pradesh, India.</li>
-        </ul>
-    </div>
 </body>
 </html>
