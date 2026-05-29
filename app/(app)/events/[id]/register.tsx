@@ -395,7 +395,16 @@ export default function RegistrationScreen() {
                     )}
                     <View style={styles.studentInfo}>
                       <Text style={[styles.studentName, { color: themeColors.text }]}>{student.name || "Student"}</Text>
-                      <Text style={[styles.studentEmail, { color: themeColors.muted }]}>{student.email}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
+                        <Text style={[styles.studentEmail, { color: themeColors.muted, marginTop: 0 }]}>{student.email}</Text>
+                        {student.batch_name && (
+                          <View style={{ backgroundColor: `${themeColors.primary}15`, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 }}>
+                            <Text style={{ fontSize: 9, fontFamily: typography.semiBold, color: themeColors.primary }}>
+                              {student.batch_name}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                     <IconSymbol name="plus" size={24} color={themeColors.primary} />
                   </TouchableOpacity>

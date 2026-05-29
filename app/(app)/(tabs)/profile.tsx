@@ -16,9 +16,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Alert,
   View,
 } from "react-native";
 
+import { CustomPhotoEditorModal } from "@/components/ui/CustomPhotoEditorModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Panel } from "@/components/ui/Panel";
@@ -61,6 +63,8 @@ export default function ProfileScreen() {
   const [invitingTeamId, setInvitingTeamId] = useState<string | null>(null);
   const [inviteeInput, setInviteeInput] = useState("");
   const [submittingInvite, setSubmittingInvite] = useState(false);
+  const [rawImageUri, setRawImageUri] = useState("");
+  const [showPhotoEditor, setShowPhotoEditor] = useState(false);
   const queryClient = useQueryClient();
   const setAuthState = useAuthStore((state) => state.setAuthState);
   const { data: registrations = [], isLoading } = useUserRegistrationsQuery(
@@ -254,7 +258,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const chooseProfilePhoto = async () => {
+  const handleGallery = async () => {
     const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
     let permission = currentPermission;
 
@@ -265,17 +269,15 @@ export default function ProfileScreen() {
     if (!permission.granted) {
       if (!permission.canAskAgain) {
         await showAlert({
-          message:
-            "Photo access is blocked for this app. Open device settings and allow media access to update your profile photo.",
+          message: "Photo access is blocked. Open device settings and allow media access.",
           title: "Permission blocked",
           tone: "warning",
         });
         await Linking.openSettings();
         return;
       }
-
       await showAlert({
-        message: "Allow media access to update your profile photo.",
+        message: "Allow media access to add your profile photo.",
         title: "Permission needed",
         tone: "warning",
       });
@@ -283,21 +285,56 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       mediaTypes: ["images"],
-      quality: 0.8,
+      quality: 1.0,
     });
 
-    if (result.canceled) {
+    if (!result.canceled && result.assets[0]?.uri) {
+      setRawImageUri(result.assets[0].uri);
+      setShowPhotoEditor(true);
+    }
+  };
+
+  const handleCamera = async () => {
+    const currentPermission = await ImagePicker.getCameraPermissionsAsync();
+    let permission = currentPermission;
+
+    if (!permission.granted && permission.canAskAgain) {
+      permission = await ImagePicker.requestCameraPermissionsAsync();
+    }
+
+    if (!permission.granted) {
+      if (!permission.canAskAgain) {
+        await showAlert({
+          message: "Camera access is blocked. Open device settings and allow camera access.",
+          title: "Permission blocked",
+          tone: "warning",
+        });
+        await Linking.openSettings();
+        return;
+      }
+      await showAlert({
+        message: "Allow camera access to take a profile photo.",
+        title: "Permission needed",
+        tone: "warning",
+      });
       return;
     }
 
-    const uri = result.assets[0]?.uri ?? "";
-    if (!uri) {
-      return;
-    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      mediaTypes: ["images"],
+      quality: 1.0,
+    });
 
+    if (!result.canceled && result.assets[0]?.uri) {
+      setRawImageUri(result.assets[0].uri);
+      setShowPhotoEditor(true);
+    }
+  };
+
+  const uploadEditedPhoto = async (uri: string) => {
     try {
       setUploadingAvatar(true);
       const newAvatar = await authService.updateAvatar(profile?.id ?? "", uri);
@@ -313,6 +350,41 @@ export default function ProfileScreen() {
     } finally {
       setUploadingAvatar(false);
     }
+  };
+
+  const handlePhotoOption = () => {
+    Alert.alert(
+      "Profile Photo",
+      "Select how you would like to add your photo",
+      [
+        { text: "Take Photo", onPress: () => void handleCamera() },
+        { text: "Choose from Gallery", onPress: () => void handleGallery() },
+        profile?.avatar_url
+          ? {
+              text: "Remove Photo",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  setUploadingAvatar(true);
+                  await authService.updateAvatar(profile?.id ?? "", "");
+                  if (profile) {
+                    setAuthState({ profile: { ...profile, avatar_url: "" }, session });
+                  }
+                } catch (error) {
+                  await showAlert({
+                    message: "Unable to remove photo",
+                    title: "Removal failed",
+                    tone: "error",
+                  });
+                } finally {
+                  setUploadingAvatar(false);
+                }
+              },
+            }
+          : undefined,
+        { text: "Cancel", style: "cancel" },
+      ].filter(Boolean) as any
+    );
   };
 
   const handleSaveProfile = async () => {
@@ -352,7 +424,17 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen scrollable>
+    <>
+      <CustomPhotoEditorModal
+        visible={showPhotoEditor}
+        rawUri={rawImageUri}
+        onCancel={() => setShowPhotoEditor(false)}
+        onSave={(editedUri) => {
+          setShowPhotoEditor(false);
+          void uploadEditedPhoto(editedUri);
+        }}
+      />
+      <Screen scrollable>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Text style={[styles.screenTitle, { color: themeColors.text }]}>{t("account")}</Text>
@@ -380,7 +462,7 @@ export default function ProfileScreen() {
           <View style={styles.avatarColumn}>
             <Pressable
               disabled={uploadingAvatar}
-              onPress={() => void chooseProfilePhoto()}
+              onPress={handlePhotoOption}
               style={({ pressed }) => [
                 styles.avatarPressable,
                 pressed && styles.menuRowPressed,
@@ -517,7 +599,7 @@ export default function ProfileScreen() {
                 {invite.events?.title ?? "Campus Event"}
               </Text>
               <Text style={{ fontFamily: typography.regular, fontSize: 13, color: themeColors.muted, marginTop: 4, marginBottom: 12, lineHeight: 18 }}>
-                You have been invited to partner up and join this event under group <Text style={{ fontFamily: typography.bold, color: themeColors.text }}>"{invite.event_teams?.name}"</Text>.
+                You have been invited to partner up and join this event under group <Text style={{ fontFamily: typography.bold, color: themeColors.text }}>&quot;{invite.event_teams?.name}&quot;</Text>.
               </Text>
 
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: themeColors.surface, padding: 12, borderRadius: 12, marginBottom: 14, borderColor: themeColors.border, borderWidth: 1 }}>
@@ -544,7 +626,7 @@ export default function ProfileScreen() {
               {invite.event_teams?.registrations && invite.event_teams.registrations.length > 0 ? (
                 <View style={{ marginBottom: 16, gap: 8 }}>
                   <Text style={{ fontSize: 12, fontFamily: typography.semiBold, color: themeColors.muted }}>
-                    Group Members in "{invite.event_teams.name}" ({invite.event_teams.registrations.length})
+                    Group Members in &quot;{invite.event_teams.name}&quot; ({invite.event_teams.registrations.length})
                   </Text>
                   {invite.event_teams.registrations.map((m: any) => {
                     const mName = m.users?.name || "Student";
@@ -904,6 +986,7 @@ export default function ProfileScreen() {
         </KeyboardAvoidingView>
       </Modal>
     </Screen>
+    </>
   );
 }
 

@@ -20,6 +20,7 @@ import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
 import { useAppFeedback } from "@/src/providers/app-feedback-provider";
 import { authService } from "@/src/services/auth-service";
+import { useAuthStore } from "@/src/store/auth-store";
 import {
     colors,
     radii,
@@ -48,6 +49,11 @@ export default function LoginScreen() {
       const profile = response.user
         ? await authService.getProfile(response.user.id)
         : null;
+      
+      if (response.session) {
+        useAuthStore.getState().setAuthState({ profile, session: response.session });
+      }
+
       router.replace(
         profile?.role === "admin"
           ? "/(app)/(tabs)/admin-dashboard"
@@ -83,7 +89,7 @@ export default function LoginScreen() {
           >
             <View style={styles.hero}>
               <Text style={styles.kicker}>Campus OS</Text>
-              <Text style={styles.title}>JI-Connect</Text>
+              <Text style={styles.title}>JIM Connect</Text>
               <Text style={styles.subtitle}>
                 Announcements, registrations, winners, repository files, and campus
                 updates in one place.

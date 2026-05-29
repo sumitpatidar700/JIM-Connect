@@ -7,10 +7,12 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
 
+import { GlobalSearchAutocomplete } from "@/components/ui/GlobalSearchAutocomplete";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Panel } from "@/components/ui/Panel";
@@ -28,6 +30,7 @@ import { colors, radii, spacing, typography } from "@/src/theme/tokens";
 import { formatEventDate } from "@/src/utils/format";
 import { useTranslation } from "@/src/utils/i18n";
 import { useThemeColors } from "@/src/utils/settings-effects";
+import { getResponsiveFontSize } from "@/src/utils/responsive";
 
 type IconName = React.ComponentProps<typeof IconSymbol>["name"];
 
@@ -56,6 +59,7 @@ type PulseItem = {
 export default function AdminDashboardScreen() {
   const router = useRouter();
   const profile = useAuthStore((state) => state.profile);
+  const activeSession = useAuthStore((state) => state.activeSession);
   const themeColors = useThemeColors();
   const { t } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
@@ -91,13 +95,7 @@ export default function AdminDashboardScreen() {
     refetch: refetchUsers,
   } = useUsersQuery();
 
-  const loading =
-    announcementsLoading ||
-    eventsLoading ||
-    winnersLoading ||
-    repositoryLoading ||
-    registrationsLoading ||
-    usersLoading;
+  const loading = announcementsLoading || eventsLoading;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -284,10 +282,16 @@ export default function AdminDashboardScreen() {
           <Text style={[styles.schoolLine, { color: themeColors.muted }]}>
             Jaipuria Institute of Management, Indore
           </Text>
+          {activeSession?.name ? (
+            <Text style={{ fontSize: 11, fontFamily: typography.semiBold, color: themeColors.primary, marginTop: 2 }}>
+              Session: {activeSession.name}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
             activeOpacity={0.8}
+            onPress={() => router.push("/(app)/notification-settings" as any)}
             style={[
               styles.headerIconButton,
               {
@@ -313,7 +317,7 @@ export default function AdminDashboardScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => router.push("/(app)/settings")}
+            onPress={() => router.push("/(app)/(tabs)/profile")}
             style={[styles.avatar, { backgroundColor: themeColors.text }]}
           >
             {profile?.avatar_url ? (
@@ -331,6 +335,10 @@ export default function AdminDashboardScreen() {
             )}
           </TouchableOpacity>
         </View>
+      </View>
+
+      <View style={[styles.searchRow, { zIndex: 100 }]}>
+        <GlobalSearchAutocomplete />
       </View>
 
       <Panel
@@ -558,14 +566,14 @@ const styles = StyleSheet.create({
   greeting: {
     color: colors.text,
     fontFamily: typography.bold,
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: getResponsiveFontSize(19, 16, 21),
+    lineHeight: 24,
   },
   header: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   headerActions: {
     alignItems: "center",
@@ -760,8 +768,8 @@ const styles = StyleSheet.create({
   schoolLine: {
     color: colors.muted,
     fontFamily: typography.medium,
-    fontSize: 10,
-    marginTop: 1,
+    fontSize: getResponsiveFontSize(13, 12, 14),
+    marginTop: 4,
   },
   sectionHeaderRow: {
     alignItems: "center",
@@ -773,6 +781,23 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: typography.semiBold,
     fontSize: 13,
+  },
+  searchBox: {
+    alignItems: "center",
+    borderRadius: radii.round,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    height: 48,
+    paddingHorizontal: spacing.md,
+  },
+  searchInput: {
+    fontFamily: typography.regular,
+    fontSize: 15,
+    height: "100%",
+  },
+  searchRow: {
+    marginBottom: 0,
   },
   sectionTitle: {
     color: colors.text,

@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
-
+import * as WebBrowser from "expo-web-browser";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -61,6 +61,7 @@ export default function EventsScreen() {
   const themeColors = useThemeColors();
   const { t } = useTranslation();
   const userId = useAuthStore((state) => state.profile?.id);
+  const activeSession = useAuthStore((state) => state.activeSession);
   const { isItemNewOnScreen, markItemAsSeen } = useBadgeStore();
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
@@ -298,6 +299,16 @@ export default function EventsScreen() {
       <Text style={[styles.subtitle, { color: themeColors.muted }]}>
         {t("eventIntro")}
       </Text>
+      {activeSession?.name ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 14, marginTop: -4 }}>
+          <View style={{ backgroundColor: themeColors.primarySoft, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <IconSymbol color={themeColors.primary} name="calendar" size={11} />
+            <Text style={{ fontFamily: typography.semiBold, fontSize: 11, color: themeColors.primary }}>
+              Session: {activeSession.name}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {pendingRequests.length > 0 ? (
         <View style={{ marginBottom: spacing.lg, gap: spacing.md }}>
@@ -325,7 +336,7 @@ export default function EventsScreen() {
 
                 <View style={{ backgroundColor: themeColors.surface, padding: 12, borderRadius: radii.md, marginBottom: 12, gap: 4 }}>
                   <Text style={{ fontFamily: typography.semiBold, fontSize: 14, color: themeColors.text }}>
-                    Group Name: "{invite.event_teams?.name || 'Team'}"
+                    Group Name: &quot;{invite.event_teams?.name || 'Team'}&quot;
                   </Text>
                   {invite.inviter ? (
                     <Text style={{ fontFamily: typography.regular, fontSize: 13, color: themeColors.muted }}>
@@ -649,36 +660,7 @@ export default function EventsScreen() {
                   </Text>
                 </View>
               </View>
-              {event.google_drive_link ? (
-                <View style={{ marginBottom: spacing.sm }}>
-                  <PrimaryButton
-                    icon="images"
-                    label="Photo Gallery"
-                    onPress={() => void Linking.openURL(event.google_drive_link!)}
-                    style={{ backgroundColor: "#4285F4" }}
-                  />
-                </View>
-              ) : null}
-              {event.links?.map((link, idx) => (
-                <View key={`link-${idx}`} style={{ marginBottom: spacing.sm }}>
-                  <PrimaryButton
-                    icon="link"
-                    label={link.title || "External Link"}
-                    onPress={() => void Linking.openURL(link.url)}
-                    style={{ backgroundColor: themeColors.primary }}
-                  />
-                </View>
-              ))}
-              {event.pdf_url ? (
-                <View style={{ marginBottom: spacing.sm }}>
-                  <PrimaryButton
-                    icon="doc.fill"
-                    label="View Attached PDF Document"
-                    onPress={() => { setPreviewPdfUrl(event.pdf_url!); setActivePreviewModal("pdf"); }}
-                    style={{ backgroundColor: themeColors.primary }}
-                  />
-                </View>
-              ) : null}
+
               {event.max_registrations ? (
                 <View style={{ marginBottom: spacing.sm, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Math.max(0, event.max_registrations - (registrationCounts[event.id] ?? 0)) <= event.max_registrations * 0.25 ? "#EF4444" : themeColors.surfaceAlt, paddingVertical: 10, paddingHorizontal: 16, borderRadius: radii.md, borderWidth: 1, borderColor: Math.max(0, event.max_registrations - (registrationCounts[event.id] ?? 0)) <= event.max_registrations * 0.25 ? "#FCA5A5" : themeColors.border }}>
                   <Text style={{ fontSize: 13, fontFamily: typography.semiBold, color: Math.max(0, event.max_registrations - (registrationCounts[event.id] ?? 0)) <= event.max_registrations * 0.25 ? "#FFFFFF" : themeColors.text }}>
@@ -780,7 +762,12 @@ export default function EventsScreen() {
               <PrimaryButton
                 label="Open Document"
                 icon="open"
-                onPress={() => void Linking.openURL(previewPdfUrl!)}
+                onPress={() => {
+                  const url = previewPdfUrl!;
+                  void WebBrowser.openBrowserAsync(
+                    Platform.OS === 'android' ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}` : url
+                  );
+                }}
                 style={{ width: "100%", backgroundColor: themeColors.primary }}
               />
             </View>

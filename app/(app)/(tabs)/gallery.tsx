@@ -13,11 +13,14 @@ import { useEventSearchQuery } from "@/src/hooks/queries/useEventSearchQuery";
 import { colors, radii, spacing, typography } from "@/src/theme/tokens";
 import { formatEventDate } from "@/src/utils/format";
 import { useThemeColors } from "@/src/utils/settings-effects";
+import { useAuthStore } from "@/src/store/auth-store";
+
 
 export default function GalleryScreen() {
   const themeColors = useThemeColors();
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const activeSession = useAuthStore((state) => state.activeSession);
 
   const { data: events = [], isLoading, refetch } = useEventSearchQuery("");
 
@@ -58,6 +61,16 @@ export default function GalleryScreen() {
       <Text style={[styles.subtitle, { color: themeColors.muted }]}>
         Explore Google Drive photo albums and memories shared from past campus events.
       </Text>
+      {activeSession?.name ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 14, marginTop: -4 }}>
+          <View style={{ backgroundColor: themeColors.primarySoft, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <IconSymbol color={themeColors.primary} name="calendar" size={11} />
+            <Text style={{ fontFamily: typography.semiBold, fontSize: 11, color: themeColors.primary }}>
+              Session: {activeSession.name}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.searchWrap}>
         <TextField

@@ -18,6 +18,8 @@ export interface AppSettingsState {
   compactLayout: boolean;
   dataSaver: boolean;
   eventAlerts: boolean;
+  teamRequestAlerts: boolean;
+  adminAlerts: boolean;
   registrationsOpen: boolean;
   fontScale: FontScale;
   language: LanguageOption;
@@ -35,6 +37,8 @@ export interface AppSettingsState {
   setCompactLayout: (value: boolean) => void;
   setDataSaver: (value: boolean) => void;
   setEventAlerts: (value: boolean) => void;
+  setTeamRequestAlerts: (value: boolean) => void;
+  setAdminAlerts: (value: boolean) => void;
   setRegistrationsOpen: (value: boolean) => void;
   setFontScale: (value: FontScale) => void;
   setLanguage: (value: LanguageOption) => void;
@@ -58,6 +62,8 @@ export const useAppSettingsStore = create<AppSettingsState>()(
       dataSaver: false,
       registrationsOpen: true,
       eventAlerts: true,
+      teamRequestAlerts: true,
+      adminAlerts: true,
       fontScale: "small",
       language: "en",
       logoPreviewEnabled: true,
@@ -74,6 +80,8 @@ export const useAppSettingsStore = create<AppSettingsState>()(
       setCompactLayout: (value) => set({ compactLayout: value }),
       setDataSaver: (value) => set({ dataSaver: value }),
       setEventAlerts: (value) => set({ eventAlerts: value }),
+      setTeamRequestAlerts: (value) => set({ teamRequestAlerts: value }),
+      setAdminAlerts: (value) => set({ adminAlerts: value }),
       setRegistrationsOpen: (value) => set({ registrationsOpen: value }),
       setFontScale: (value) => set({ fontScale: value }),
       setLanguage: (value) => set({ language: value }),

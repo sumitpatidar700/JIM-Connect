@@ -12,6 +12,7 @@ type SignupPayload = Credentials & {
   avatarImageUri: string;
   name: string;
   phone?: string;
+  batchId?: string;
 };
 
 type ProfileUpdatePayload = {
@@ -45,28 +46,36 @@ async function ensurePhoneAvailable(phone: string | null, userId?: string) {
     return;
   }
 
-  let query = supabase.from('users').select('id').eq('phone', phone).limit(1);
-  if (userId) {
-    query = query.neq('id', userId);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('check_user_credentials_exist', {
+    phone_to_check: phone,
+    user_id_to_exclude: userId || null
+  });
   if (error) {
     throw error;
   }
 
-  if (data && data.length > 0) {
+  if (data && data[0]?.phone_exists) {
     throw new Error('This phone number is already linked to another account.');
   }
 }
 
 export const authService = {
   async getProfile(userId: string): Promise<UserProfile | null> {
-    const { data, error } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+    const { data, error } = await supabase
+      .from('users')
+      .select('*, batches(name)')
+      .eq('id', userId)
+      .maybeSingle();
     if (error) {
       throw error;
     }
-    return data;
+    if (data) {
+      return {
+        ...data,
+        batch_name: data.batches?.name || null
+      } as UserProfile;
+    }
+    return null;
   },
 
   async signIn({ email, password }: Credentials) {
@@ -86,8 +95,35 @@ export const authService = {
     clearAppQueryCache();
   },
 
-  async signUp({ avatarImageUri, email, name, password, phone }: SignupPayload) {
+  async checkEmailRegistered(email: string): Promise<boolean> {
     ensureSupabaseConfigured();
+    const cleanEmail = email.trim().toLowerCase();
+    const isAllowed = cleanEmail.endsWith('@jaipuria.ac.in') || 
+                      cleanEmail === 'sumitpatidar700@gmail.com' || 
+                      cleanEmail === 'sumitpatidar16903@gmail.com' ||
+                      cleanEmail === 'sumitpatidar1602@gmail.com';
+    if (!isAllowed) {
+      throw new Error('Only users with a @jaipuria.ac.in email address can register.');
+    }
+    const { data, error } = await supabase.rpc('check_user_credentials_exist', {
+      email_to_check: cleanEmail
+    });
+    if (error) {
+      throw error;
+    }
+    return Boolean(data && data[0]?.email_exists);
+  },
+
+  async signUp({ avatarImageUri, email, name, password, phone, batchId }: SignupPayload) {
+    ensureSupabaseConfigured();
+    const cleanEmail = email.trim().toLowerCase();
+    const isAllowed = cleanEmail.endsWith('@jaipuria.ac.in') || 
+                      cleanEmail === 'sumitpatidar700@gmail.com' || 
+                      cleanEmail === 'sumitpatidar16903@gmail.com' ||
+                      cleanEmail === 'sumitpatidar1602@gmail.com';
+    if (!isAllowed) {
+      throw new Error('Only users with a @jaipuria.ac.in email address can register.');
+    }
     const normalizedPhone = normalizePhoneNumber(phone);
     await ensurePhoneAvailable(normalizedPhone);
 
@@ -105,7 +141,7 @@ export const authService = {
       throw error;
     }
 
-    if (data.user) {
+    if (data.session && data.user) {
       const avatarUrl = await storageService.uploadImage(
         'profile-assets',
         `avatars/${data.user.id}`,
@@ -114,8 +150,16 @@ export const authService = {
 
       const { error: profileError } = await supabase
         .from('users')
-        .update({ avatar_url: avatarUrl, phone: normalizedPhone })
-        .eq('id', data.user.id);
+        .upsert({
+          id: data.user.id,
+          name,
+          email: cleanEmail,
+          avatar_url: avatarUrl,
+          phone: normalizedPhone,
+          email_confirmed: true,
+          batch_id: batchId || null,
+          role: 'student',
+        });
 
       if (profileError) {
         throw profileError;
@@ -124,6 +168,47 @@ export const authService = {
 
     return data;
   },
+
+  async verifySignUpOtp({ email, token, userId, avatarImageUri, phone, batchId, name }: { email: string; token: string; userId: string; avatarImageUri: string; phone?: string; batchId?: string; name: string }) {
+    ensureSupabaseConfigured();
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'signup',
+    });
+    if (error) {
+      throw error;
+    }
+
+    if (data.user) {
+      const normalizedPhone = normalizePhoneNumber(phone);
+      const avatarUrl = await storageService.uploadImage(
+        'profile-assets',
+        `avatars/${data.user.id}`,
+        avatarImageUri,
+      );
+
+      const { error: profileError } = await supabase
+        .from('users')
+        .upsert({
+          id: data.user.id,
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          avatar_url: avatarUrl,
+          phone: normalizedPhone,
+          email_confirmed: true,
+          batch_id: batchId || null,
+          role: 'student',
+        });
+
+      if (profileError) {
+        throw profileError;
+      }
+    }
+
+    return data;
+  },
+
   async updateProfile({ name, phone, userId }: ProfileUpdatePayload) {
     if (!userId) {
       throw new Error('Missing user id');
@@ -141,7 +226,7 @@ export const authService = {
       .from('users')
       .update({ name: normalizedName, phone: normalizedPhone })
       .eq('id', userId)
-      .select('*')
+      .select('*, batches(name)')
       .single();
 
     if (error) {
@@ -151,7 +236,10 @@ export const authService = {
       throw error;
     }
 
-    return data as UserProfile;
+    return {
+      ...data,
+      batch_name: data.batches?.name || null
+    } as UserProfile;
   },
   async updatePrivacy(userId: string, isPrivate: boolean) {
     if (!userId) {
@@ -161,13 +249,16 @@ export const authService = {
       .from('users')
       .update({ is_private: isPrivate })
       .eq('id', userId)
-      .select('*')
+      .select('*, batches(name)')
       .single();
 
     if (error) {
       throw error;
     }
-    return data as UserProfile;
+    return {
+      ...data,
+      batch_name: data.batches?.name || null
+    } as UserProfile;
   },
   async updateAvatar(userId: string, avatarImageUri?: string | null) {
     if (!userId) {
@@ -195,7 +286,7 @@ export const authService = {
     return avatarUrl;
   },
   async listUsers(searchQuery?: string, limit: number = 50): Promise<UserProfile[]> {
-    let query = supabase.rpc('get_directory_users');
+    let query = supabase.from('users').select('*, batches(name)').neq('role', 'admin');
     
     if (searchQuery) {
       const qs = searchQuery.trim();
@@ -208,7 +299,10 @@ export const authService = {
     if (error) {
       throw error;
     }
-    return data || [];
+    return (data || []).map(u => ({
+      ...u,
+      batch_name: u.batches?.name || null
+    })) as UserProfile[];
   },
   
   async sendPasswordResetEmail(email: string) {

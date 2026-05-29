@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { supabase } from '@/src/lib/supabase';
 import { authService } from '@/src/services/auth-service';
+import { sessionService } from '@/src/services/session-service';
 import { useAuthStore } from '@/src/store/auth-store';
 
 export function useAuthBootstrap() {
@@ -29,9 +30,13 @@ export function useAuthBootstrap() {
 
         if (session) {
           try {
-            const profile = await authService.getProfile(session.user.id);
+            const [profile, activeSession] = await Promise.all([
+              authService.getProfile(session.user.id),
+              sessionService.getActiveSession().catch(() => null),
+            ]);
             if (mounted) {
               setAuthState({ profile, session });
+              useAuthStore.setState({ activeSession });
             }
           } catch (profileError) {
             console.error("Failed to fetch profile during hydrate:", profileError);
@@ -42,11 +47,13 @@ export function useAuthBootstrap() {
           }
         } else {
           clearAuthState();
+          useAuthStore.setState({ activeSession: null });
         }
       } catch (error) {
         console.error("Hydration error:", error);
         if (mounted) {
           clearAuthState();
+          useAuthStore.setState({ activeSession: null });
         }
       } finally {
         if (mounted) {
@@ -57,13 +64,18 @@ export function useAuthBootstrap() {
 
     void hydrate();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
+        console.log('[AuthBootstrap] auth state change event:', event, 'hasSession:', !!session);
         if (session) {
           try {
-            const profile = await authService.getProfile(session.user.id);
+            const [profile, activeSession] = await Promise.all([
+              authService.getProfile(session.user.id),
+              sessionService.getActiveSession().catch(() => null),
+            ]);
             if (mounted) {
               setAuthState({ profile, session });
+              useAuthStore.setState({ activeSession });
             }
           } catch (profileError) {
             console.error("Failed to fetch profile during auth state change:", profileError);
@@ -72,13 +84,15 @@ export function useAuthBootstrap() {
                useAuthStore.setState((state) => ({ session, profile: state.profile }));
             }
           }
-        } else if (mounted) {
+        } else if (mounted && event === 'SIGNED_OUT') {
           clearAuthState();
+          useAuthStore.setState({ activeSession: null });
         }
       } catch (error) {
         console.error("Auth state change error:", error);
-        if (mounted && _event === 'SIGNED_OUT') {
+        if (mounted && event === 'SIGNED_OUT') {
           clearAuthState();
+          useAuthStore.setState({ activeSession: null });
         }
       } finally {
         if (mounted) {

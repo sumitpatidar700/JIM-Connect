@@ -197,7 +197,6 @@ export function SupportSection() {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <IconSymbol name="info" size={20} color={themeColors.primary} />
           <Text style={[styles.title, { color: themeColors.text }]}>
             {isAdmin ? "User Support Queries" : "Support & Admin Help"}
           </Text>

@@ -2,6 +2,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 
 import { storageService } from '@/src/services/storage-service';
 import { supabase } from '@/src/lib/supabase';
+import { sessionService } from '@/src/services/session-service';
 import {
   EventItem,
   EventRegistration,
@@ -20,6 +21,7 @@ type EventPayload = Pick<EventItem, 'created_by' | 'date' | 'description' | 'tit
   maxTeamSize?: number;
   committees?: string[];
   clubs?: string[];
+  batchId?: string | null;
 };
 
 type EventUpdatePayload = Pick<EventItem, 'date' | 'description' | 'title' | 'venue'> & {
@@ -33,6 +35,7 @@ type EventUpdatePayload = Pick<EventItem, 'date' | 'description' | 'title' | 've
   maxTeamSize?: number;
   committees?: string[];
   clubs?: string[];
+  batchId?: string | null;
 };
 
 function normalizeEventDate(value: string) {
@@ -118,6 +121,7 @@ export const eventService = {
     const max_registrations = payload.maxRegistrations && !Number.isNaN(Number(payload.maxRegistrations))
       ? Number(payload.maxRegistrations)
       : null;
+    const activeSession = await sessionService.getActiveSession();
     const { error } = await supabase.from('events').insert({
       created_by: payload.created_by,
       date,
@@ -135,6 +139,8 @@ export const eventService = {
       venue: payload.venue,
       committees: payload.committees ?? [],
       clubs: payload.clubs ?? [],
+      session_id: activeSession?.id ?? null,
+      batch_id: payload.batchId ?? null,
     });
     if (error) {
       throw error;
@@ -231,11 +237,23 @@ export const eventService = {
     }, {});
   },
 
-  async listUpcomingEvents({ limit = 6 }: { limit?: number } = {}): Promise<EventItem[]> {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .gte('date', new Date().toISOString())
+  async listUpcomingEvents({ limit = 6, batchId }: { limit?: number; batchId?: string | null } = {}): Promise<EventItem[]> {
+    const activeSession = await sessionService.getActiveSession();
+    let query = supabase.from('events').select('*').gte('date', new Date().toISOString());
+    
+    if (activeSession) {
+      query = query.eq('session_id', activeSession.id);
+    }
+
+    if (batchId !== undefined) {
+      if (batchId === null) {
+        query = query.is('batch_id', null);
+      } else {
+        query = query.or(`batch_id.is.null,batch_id.eq.${batchId}`);
+      }
+    }
+
+    const { data, error } = await query
       .order('date', { ascending: true })
       .limit(limit);
     if (error) {
@@ -430,10 +448,28 @@ export const eventService = {
     if (error) throw error;
   },
 
-  async searchEvents(query: string, options?: { committees?: string[]; clubs?: string[] }): Promise<EventItem[]> {
-    let builder = supabase.from('events').select('*').order('date', { ascending: true });
+  async searchEvents(query: string, options?: { committees?: string[]; clubs?: string[]; batchId?: string | null }): Promise<EventItem[]> {
+    const activeSession = await sessionService.getActiveSession();
+    let builder = supabase.from('events').select('*');
+
+    if (activeSession) {
+      builder = builder.eq('session_id', activeSession.id);
+    }
+
+    if (options?.batchId !== undefined) {
+      if (options.batchId === null) {
+        builder = builder.is('batch_id', null);
+      } else {
+        builder = builder.or(`batch_id.is.null,batch_id.eq.${options.batchId}`);
+      }
+    }
+
+    builder = builder.order('date', { ascending: true });
 
     if (query.trim()) {
+      // NOTE: Be careful! Mixing .or() for query text search and batch filtering might cause issues in postgrest if not handled correctly.
+      // However, Supabase/PostgREST filters are chained as AND unless grouped. Chaining or with separate clauses is fine, but double check.
+      // Actually, PostgREST allows adding individual filters. We can use .or() for title/desc/venue, and the query is ANDed with batch_id filters.
       builder = builder.or(
         `title.ilike.%${query.trim()}%,description.ilike.%${query.trim()}%,venue.ilike.%${query.trim()}%`
       );

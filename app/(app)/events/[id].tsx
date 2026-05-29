@@ -6,8 +6,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share, PanResponder } from 'react-native';
 import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { BackButton } from '@/components/ui/BackButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -432,7 +432,12 @@ export default function EventDetailsScreen() {
             {event?.pdf_url ? (
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => void Linking.openURL(event.pdf_url!)}
+                onPress={() => {
+                  const url = event.pdf_url!;
+                  void WebBrowser.openBrowserAsync(
+                    Platform.OS === 'android' ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}` : url
+                  );
+                }}
                 style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: themeColors.primarySoft, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: themeColors.primary + "30" }}
               >
                 <Ionicons name="document-text" size={16} color={themeColors.primary} />
@@ -489,7 +494,7 @@ export default function EventDetailsScreen() {
             <Text style={{ fontSize: 16, fontFamily: typography.bold, color: themeColors.text }}>Group Invitation Pending</Text>
           </View>
           <Text style={{ fontSize: 14, color: themeColors.text, marginBottom: 12, lineHeight: 20 }}>
-            You have been invited to partner up and join this event under group <Text style={{ fontFamily: typography.bold, color: themeColors.text }}>"{myTeamName}"</Text>.
+            You have been invited to partner up and join this event under group <Text style={{ fontFamily: typography.bold, color: themeColors.text }}>&quot;{myTeamName}&quot;</Text>.
           </Text>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: themeColors.surface, padding: 12, borderRadius: 12, marginBottom: 14, borderColor: themeColors.border, borderWidth: 1 }}>
@@ -516,7 +521,7 @@ export default function EventDetailsScreen() {
           {userRegistration?.event_teams?.registrations && userRegistration.event_teams.registrations.length > 0 ? (
             <View style={{ marginBottom: 16, gap: 8 }}>
               <Text style={{ fontSize: 12, fontFamily: typography.semiBold, color: themeColors.muted }}>
-                Group Members in "{myTeamName}" ({userRegistration.event_teams.registrations.length})
+                Group Members in &quot;{myTeamName}&quot; ({userRegistration.event_teams.registrations.length})
               </Text>
               {userRegistration.event_teams.registrations.map((m: any) => {
                 const mName = m.users?.name || "Student";

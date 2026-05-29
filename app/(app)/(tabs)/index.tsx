@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import { EmptyState } from "@/components/ui/EmptyState";
+import { GlobalSearchAutocomplete } from "@/components/ui/GlobalSearchAutocomplete";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Panel } from "@/components/ui/Panel";
@@ -74,10 +75,11 @@ export default function HomeScreen() {
   const themeColors = useThemeColors();
   const { t } = useTranslation();
   const profile = useAuthStore((state) => state.profile);
+  const activeSession = useAuthStore((state) => state.activeSession);
   const { isItemNewOnScreen, markItemAsSeen } = useBadgeStore();
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
-  const [searchQuery, setSearchQuery] = useState("");
+
   const {
     data: announcements = [],
     isLoading: announcementsLoading,
@@ -132,10 +134,11 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
+    const studentBatchId = profile?.batch_id ?? null;
     const announcementsChannel = announcementService.subscribeToAnnouncements(
       () => {
         void queryClient.invalidateQueries({
-          queryKey: queryKeys.announcements,
+          queryKey: queryKeys.announcements(studentBatchId),
         });
       },
     );
@@ -149,21 +152,8 @@ export default function HomeScreen() {
       announcementService.unsubscribe(announcementsChannel);
       eventService.unsubscribe(eventsChannel);
     };
-  }, [queryClient]);
+  }, [queryClient, refetchEvents]);
 
-  const filteredEvents = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return events;
-    }
-
-    const query = searchQuery.toLowerCase();
-    return events.filter(
-      (event) =>
-        event.title.toLowerCase().includes(query) ||
-        event.description.toLowerCase().includes(query) ||
-        event.venue.toLowerCase().includes(query),
-    );
-  }, [events, searchQuery]);
 
   const quickActions = useMemo<QuickAction[]>(
     () => [
@@ -322,18 +312,21 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={[styles.greeting, { color: themeColors.text }]}>
-            {t("hey")}{" "}
-            {profileVisibility
-              ? getDisplayFirstName(profile?.name, profile?.email)
-              : "Campus Member"}
+            {t("hey")} {profile?.name || "Campus Member"}
           </Text>
           <Text style={[styles.schoolLine, { color: themeColors.muted }]}>
             Jaipuria Institute of Management, Indore
           </Text>
+          {activeSession?.name ? (
+            <Text style={{ fontSize: 11, fontFamily: typography.semiBold, color: themeColors.primary, marginTop: 2 }}>
+              Session: {activeSession.name}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
             activeOpacity={0.8}
+            onPress={() => router.push("/(app)/notification-settings" as any)}
             style={[
               styles.headerIconButton,
               {
@@ -364,7 +357,7 @@ export default function HomeScreen() {
             onPress={() => router.push("/(app)/(tabs)/profile")}
             style={[styles.avatar, { backgroundColor: themeColors.text }]}
           >
-            {profileVisibility && profile?.avatar_url ? (
+            {profile?.avatar_url ? (
               <Image
                 source={{ uri: profile.avatar_url }}
                 style={styles.avatarImage}
@@ -374,374 +367,405 @@ export default function HomeScreen() {
               <Text
                 style={[styles.avatarText, { color: themeColors.background }]}
               >
-                {profileVisibility ? getInitials(profile?.name) : "JC"}
+                {getInitials(profile?.name)}
               </Text>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.searchRow}>
-        <View
-          style={[
-            styles.searchBox,
-            {
-              backgroundColor: themeColors.surface,
-              borderColor: themeColors.border,
-            },
-          ]}
-        >
-          <IconSymbol
-            color={themeColors.muted}
-            name="search-outline"
-            size={18}
-          />
-          <TextInput
-            placeholder={t("searchHome")}
-            placeholderTextColor={themeColors.muted}
-            style={[styles.searchInput, { color: themeColors.text }]}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+      <View style={[styles.searchRow, { zIndex: 100 }]}>
+        <GlobalSearchAutocomplete />
       </View>
 
-      <Panel
-        style={[styles.heroCard, { backgroundColor: themeColors.surfaceAlt }]}
-      >
-        <View style={styles.heroTopRow}>
-          <View style={styles.heroTimeBlock}>
-            <Text style={[styles.heroTimeValue, { color: themeColors.text }]}>
-              {formatClock(now)}
-            </Text>
-            <Text style={[styles.heroTimeDate, { color: themeColors.muted }]}>
-              {formatDashboardDate(now)}
-            </Text>
-          </View>
-          <Pill
-            label={profile?.role === "admin" ? "Admin" : "Student"}
-            tone="dark"
-          />
-        </View>
-        <Text style={[styles.heroTitle, { color: themeColors.text }]}>
-          A sharper daily dashboard for Jaipuria Institute of Management,
-          Indore.
-        </Text>
-        <Text style={[styles.heroBody, { color: themeColors.muted }]}>
-          Track announcements, catch upcoming events, and jump into the right
-          action without digging through screens.
-        </Text>
-      </Panel>
-
-      <View style={styles.quickActionsSection}>
-        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-          {t("quickActions")}
-        </Text>
-        <View style={styles.quickActionsRow}>
-          {quickActions.map((action) => (
-            <TouchableOpacity
-              key={action.id}
-              activeOpacity={0.8}
-              onPress={action.onPress}
-              style={styles.quickActionItem}
-            >
-              <View
-                style={[
-                  styles.quickActionIconWrap,
-                  { backgroundColor: action.color },
-                ]}
-              >
-                <IconSymbol
-                  color={themeColors.text}
-                  name={action.icon}
-                  size={22}
-                />
+      {!activeSession ? (
+        <View style={styles.warningContainer}>
+          <Panel style={styles.warningPanel}>
+            <View style={[styles.warningIconContainer, { backgroundColor: themeColors.primarySoft }]}>
+              <Ionicons name="calendar-outline" size={48} color={themeColors.primary} />
+              <View style={styles.warningAlertBadge}>
+                <Ionicons name="alert-circle" size={20} color="#EF4444" />
               </View>
-              <Text
-                style={[styles.quickActionLabel, { color: themeColors.text }]}
-              >
-                {action.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.overviewSection}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-            {t("overview")}
-          </Text>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => router.push("/(app)/(tabs)/events")}
-          >
-            <Text style={[styles.sectionLink, { color: themeColors.primary }]}>
-              {t("seeAll")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.statsGrid}>
-          {overviewStats.map((item) => (
-            <View
-              key={item.label}
-              style={[styles.statCard, { backgroundColor: item.color }]}
-            >
-              <View
-                style={[
-                  styles.statIcon,
-                  { backgroundColor: themeColors.surface },
-                ]}
-              >
-                <IconSymbol
-                  color={themeColors.text}
-                  name={item.icon}
-                  size={18}
-                />
-              </View>
-              <Text style={[styles.statValue, { color: themeColors.text }]}>
-                {item.value}
-              </Text>
-              <Text style={[styles.statLabel, { color: themeColors.muted }]}>
-                {item.label}
-              </Text>
             </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.activitySection}>
-        <Text
-          style={[
-            styles.sectionTitle,
-            styles.activityHeading,
-            { color: themeColors.text },
-          ]}
-        >
-          Campus Pulse
-        </Text>
-        <Panel>
-          {activityFeed.length === 0 ? (
-            <EmptyState
-              message={t("nothingNewYetMessage")}
-              title={t("nothingNewYet")}
-            />
-          ) : (
-            activityFeed.map((item, index) => (
-              <View
-                key={`${item.title}-${index}`}
-                style={[
-                  styles.activityItem,
-                  index === activityFeed.length - 1 && styles.activityItemLast,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.activityIconWrap,
-                    { backgroundColor: item.color },
-                  ]}
-                >
-                  <IconSymbol
-                    color={themeColors.text}
-                    name={item.icon}
-                    size={18}
-                  />
-                </View>
-                <View style={styles.activityText}>
-                  <Text
-                    style={[styles.activityTitle, { color: themeColors.text }]}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.activitySubtitle,
-                      { color: themeColors.muted },
-                    ]}
-                  >
-                    {item.subtitle}
-                  </Text>
-                </View>
-                <IconSymbol
-                  color={themeColors.muted}
-                  name="chevron.right"
-                  size={16}
-                />
-              </View>
-            ))
-          )}
-        </Panel>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => router.push("/(app)/student-logs")}
-          style={styles.viewAllRedirect}
-        >
-          <Text style={[styles.viewAllRedirectText, { color: themeColors.primary }]}>
-            View All Activity
-          </Text>
-          <IconSymbol 
-            color={themeColors.primary} 
-            name="chevron.right" 
-            size={16} 
-          />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.eventsSection}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-            {t("exploreModules")}
-          </Text>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => router.push("/(app)/(tabs)/events")}
-          >
-            <Text style={[styles.sectionLink, { color: themeColors.primary }]}>
-              {t("seeAll")}
+            
+            <Text style={[styles.warningTitle, { color: themeColors.text }]}>
+              No Active Academic Session
             </Text>
-          </TouchableOpacity>
+            
+            <Text style={[styles.warningDescription, { color: themeColors.muted }]}>
+              {profile?.role === "admin"
+                ? "Please select or create an academic session in App Settings to publish notices, events, and results."
+                : "Your campus feed is currently offline. Please check back later."}
+            </Text>
+
+            {profile?.role === "admin" && (
+              <PrimaryButton
+                label="Go to Settings"
+                onPress={() => router.push("/(app)/settings")}
+                icon="settings"
+                style={styles.warningButton}
+              />
+            )}
+          </Panel>
         </View>
-        {filteredEvents.length === 0 ? (
-          <EmptyState message={t("noEventsSearch")} title={t("nothingFound")} />
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.eventCarousel}
+      ) : (
+        <>
+          <Panel
+            style={[styles.heroCard, { backgroundColor: themeColors.surfaceAlt }]}
           >
-            {filteredEvents.map((event) => (
-              <View key={event.id} style={styles.featureCard}>
-                <Panel style={styles.featureCardInner}>
-                  <View style={styles.featureTopRow}>
-                    <Pill label="JIM Indore Event" tone="brand" />
-                    <TouchableOpacity activeOpacity={0.8}>
-                      <Ionicons
-                        color={themeColors.muted}
-                        name="heart-outline"
-                        size={18}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                  <Text
-                    style={[styles.featureTitle, { color: themeColors.text }]}
-                  >
-                    {event.title}
-                  </Text>
-                  <Text
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroTimeBlock}>
+                <Text style={[styles.heroTimeValue, { color: themeColors.text }]}>
+                  {formatClock(now)}
+                </Text>
+                <Text style={[styles.heroTimeDate, { color: themeColors.muted }]}>
+                  {formatDashboardDate(now)}
+                </Text>
+              </View>
+              <Pill
+                label={profile?.role === "admin" ? "Admin" : "Student"}
+                tone="dark"
+              />
+            </View>
+            <Text style={[styles.heroTitle, { color: themeColors.text }]}>
+              A sharper daily dashboard for Jaipuria Institute of Management,
+              Indore.
+            </Text>
+            <Text style={[styles.heroBody, { color: themeColors.muted }]}>
+              Track announcements, catch upcoming events, and jump into the right
+              action without digging through screens.
+            </Text>
+          </Panel>
+
+          <View style={styles.quickActionsSection}>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+              {t("quickActions")}
+            </Text>
+            <View style={styles.quickActionsRow}>
+              {quickActions.map((action) => (
+                <TouchableOpacity
+                  key={action.id}
+                  activeOpacity={0.8}
+                  onPress={action.onPress}
+                  style={styles.quickActionItem}
+                >
+                  <View
                     style={[
-                      styles.featureSubtitle,
-                      { color: themeColors.muted },
+                      styles.quickActionIconWrap,
+                      { backgroundColor: action.color },
                     ]}
                   >
-                    {formatEventDate(event.date)} • {event.venue}
-                  </Text>
-                  <Text
-                    numberOfLines={3}
-                    style={[styles.featureBody, { color: themeColors.muted }]}
-                  >
-                    {event.description}
-                  </Text>
-                  <View style={styles.featureFooter}>
-                    <PrimaryButton
-                      label="View Event"
-                      onPress={() =>
-                        router.push(
-                          profile?.role === "admin"
-                            ? "/(app)/(tabs)/admin-dashboard"
-                            : "/(app)/settings",
-                        )
-                      }
-                      variant="secondary"
+                    <IconSymbol
+                      color={themeColors.text}
+                      name={action.icon}
+                      size={22}
                     />
                   </View>
-                </Panel>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-      </View>
+                  <Text
+                    style={[styles.quickActionLabel, { color: themeColors.text }]}
+                  >
+                    {action.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
-      <View style={styles.feedSection}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-            {t("announcements")}
-          </Text>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => router.push("/(app)/notices")}
-          >
-            <Text style={[styles.sectionLink, { color: themeColors.primary }]}>
-              {t("seeAll")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        {visibleAnnouncements.length === 0 ? (
-          <EmptyState
-            message={
-              pushNotifications && announcementAlerts
-                ? t("feedIsQuietMessage")
-                : t("announcementsHiddenMessage")
-            }
-            title={
-              pushNotifications && announcementAlerts
-                ? t("feedIsQuiet")
-                : t("announcementsHidden")
-            }
-          />
-        ) : (
-          visibleAnnouncements.slice(0, 2).map((announcement) => {
-            const isNew = isItemNewOnScreen(announcement.id, announcement.created_at, "index");
-            return (
-              <TouchableOpacity
-                key={announcement.id}
-                activeOpacity={0.8}
-                onPress={() => {
-                  markItemAsSeen(announcement.id);
-                  router.push("/(app)/notices");
-                }}
-              >
-                <Panel style={styles.feedCard}>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                    <Text style={[styles.feedTitle, { color: themeColors.text, marginBottom: 0, flex: 1 }]}>
-                      {announcement.title}
-                    </Text>
-                    {isNew ? (
-                      <Pill label="NEW" tone="danger" />
-                    ) : null}
+          <View style={styles.overviewSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+                {t("overview")}
+              </Text>
+            </View>
+            <View style={styles.statsGrid}>
+              {overviewStats.map((item) => (
+                <View
+                  key={item.label}
+                  style={[styles.statCard, { backgroundColor: item.color }]}
+                >
+                  <View style={[styles.statLineAccent, { backgroundColor: themeColors.primary }]} />
+                  <View
+                    style={[
+                      styles.statIcon,
+                      { backgroundColor: themeColors.surface },
+                    ]}
+                  >
+                    <IconSymbol
+                      color={themeColors.text}
+                      name={item.icon}
+                      size={18}
+                    />
                   </View>
-                  <Text style={[styles.feedMeta, { color: themeColors.muted }]}>
-                    {formatEventDate(announcement.created_at)}
-                  </Text>
-                  <Text style={[styles.feedBody, { color: themeColors.muted }]}>
-                    {announcement.description}
-                  </Text>
-                </Panel>
-              </TouchableOpacity>
-            );
-          })
-        )}
-        {visibleAnnouncements.length > 2 ? (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => router.push("/(app)/notices")}
-            style={styles.viewAllRedirect}
-          >
-            <Text style={[styles.viewAllRedirectText, { color: themeColors.primary }]}>
-              View All Notices
+                  <View style={styles.statContent}>
+                    <Text style={[styles.statValue, { color: themeColors.text }]}>
+                      {item.value}
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.statLabel, { color: themeColors.muted }]}>
+                      {item.label}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.activitySection}>
+            <Text
+              style={[
+                styles.sectionTitle,
+                styles.activityHeading,
+                { color: themeColors.text },
+              ]}
+            >
+              Campus Pulse
             </Text>
-            <IconSymbol 
-              color={themeColors.primary} 
-              name="chevron.right" 
-              size={16} 
-            />
-          </TouchableOpacity>
-        ) : null}
-      </View>
+            <Panel>
+              {activityFeed.length === 0 ? (
+                <EmptyState
+                  message={t("nothingNewYetMessage")}
+                  title={t("nothingNewYet")}
+                />
+              ) : (
+                activityFeed.map((item, index) => (
+                  <View
+                    key={`${item.title}-${index}`}
+                    style={[
+                      styles.activityItem,
+                      index === activityFeed.length - 1 && styles.activityItemLast,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.activityIconWrap,
+                        { backgroundColor: item.color },
+                      ]}
+                    >
+                      <IconSymbol
+                        color={themeColors.text}
+                        name={item.icon}
+                        size={18}
+                      />
+                    </View>
+                    <View style={styles.activityText}>
+                      <Text
+                        style={[styles.activityTitle, { color: themeColors.text }]}
+                      >
+                        {item.title}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.activitySubtitle,
+                          { color: themeColors.muted },
+                        ]}
+                      >
+                        {item.subtitle}
+                      </Text>
+                    </View>
+                    <IconSymbol
+                      color={themeColors.muted}
+                      name="chevron.right"
+                      size={16}
+                    />
+                  </View>
+                ))
+              )}
+            </Panel>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push("/(app)/student-logs")}
+              style={styles.viewAllRedirect}
+            >
+              <Text style={[styles.viewAllRedirectText, { color: themeColors.primary }]}>
+                View All Activity
+              </Text>
+              <IconSymbol 
+                color={themeColors.primary} 
+                name="chevron.right" 
+                size={16} 
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.eventsSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+                {t("exploreModules")}
+              </Text>
+            </View>
+            {events.length === 0 ? (
+              <EmptyState message={t("noEventsSearch")} title={t("nothingFound")} />
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.eventCarousel}
+              >
+                {events.map((event) => (
+                  <View key={event.id} style={styles.featureCard}>
+                    <Panel style={styles.featureCardInner}>
+                      <View style={styles.featureTopRow}>
+                        <Pill label="JIM Indore Event" tone="brand" />
+                        <TouchableOpacity activeOpacity={0.8}>
+                          <Ionicons
+                            color={themeColors.muted}
+                            name="heart-outline"
+                            size={18}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      <Text
+                        style={[styles.featureTitle, { color: themeColors.text }]}
+                      >
+                        {event.title}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.featureSubtitle,
+                          { color: themeColors.muted },
+                        ]}
+                      >
+                        {formatEventDate(event.date)} • {event.venue}
+                      </Text>
+                      <Text
+                        numberOfLines={3}
+                        style={[styles.featureBody, { color: themeColors.muted }]}
+                      >
+                        {event.description}
+                      </Text>
+                      <View style={styles.featureFooter}>
+                        <PrimaryButton
+                          label="View Event"
+                          onPress={() => router.push(`/(app)/events/${event.id}`)}
+                          variant="secondary"
+                        />
+                      </View>
+                    </Panel>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
+          <View style={styles.feedSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+                {t("announcements")}
+              </Text>
+            </View>
+            {visibleAnnouncements.length === 0 ? (
+              <EmptyState
+                message={
+                  pushNotifications && announcementAlerts
+                    ? t("feedIsQuietMessage")
+                    : t("announcementsHiddenMessage")
+                }
+                title={
+                  pushNotifications && announcementAlerts
+                    ? t("feedIsQuiet")
+                    : t("announcementsHidden")
+                }
+              />
+            ) : (
+              visibleAnnouncements.slice(0, 2).map((announcement) => {
+                const isNew = isItemNewOnScreen(announcement.id, announcement.created_at, "index");
+                return (
+                  <TouchableOpacity
+                    key={announcement.id}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      markItemAsSeen(announcement.id);
+                      router.push("/(app)/notices");
+                    }}
+                  >
+                    <Panel style={styles.feedCard}>
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <Text style={[styles.feedTitle, { color: themeColors.text, marginBottom: 0, flex: 1 }]}>
+                          {announcement.title}
+                        </Text>
+                        {isNew ? (
+                          <Pill label="NEW" tone="danger" />
+                        ) : null}
+                      </View>
+                      <Text style={[styles.feedMeta, { color: themeColors.muted }]}>
+                        {formatEventDate(announcement.created_at)}
+                      </Text>
+                      <Text style={[styles.feedBody, { color: themeColors.muted }]}>
+                        {announcement.description}
+                      </Text>
+                    </Panel>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+            {visibleAnnouncements.length > 2 ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => router.push("/(app)/notices")}
+                style={styles.viewAllRedirect}
+              >
+                <Text style={[styles.viewAllRedirectText, { color: themeColors.primary }]}>
+                  View All Notices
+                </Text>
+                <IconSymbol 
+                  color={themeColors.primary} 
+                  name="chevron.right" 
+                  size={16} 
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  warningContainer: {
+    padding: spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.xl,
+  },
+  warningPanel: {
+    width: "100%",
+    alignItems: "center",
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  warningIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    marginBottom: spacing.sm,
+  },
+  warningAlertBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 2,
+  },
+  warningTitle: {
+    fontSize: 20,
+    fontFamily: typography.bold,
+    textAlign: "center",
+  },
+  warningDescription: {
+    fontSize: 14,
+    fontFamily: typography.regular,
+    lineHeight: 22,
+    textAlign: "center",
+    paddingHorizontal: spacing.sm,
+  },
+  warningButton: {
+    width: "100%",
+    marginTop: spacing.md,
+  },
   activityIconWrap: {
     alignItems: "center",
     borderRadius: 14,
@@ -1047,34 +1071,57 @@ const styles = StyleSheet.create({
     fontSize: getResponsiveFontSize(17, 16, 18),
   },
   statCard: {
-    borderRadius: 24,
-    minHeight: 138,
-    padding: spacing.lg,
-    width: (width - spacing.lg * 2 - spacing.md) / 2,
+    alignItems: "center",
+    borderRadius: 16,
+    flexDirection: "row",
+    minHeight: 68,
+    overflow: "hidden",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    position: "relative",
+    width: "48%",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+  },
+  statLineAccent: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4.5,
   },
   statIcon: {
     alignItems: "center",
-    backgroundColor: colors.white,
-    borderRadius: 12,
+    borderRadius: 10,
     height: 36,
     justifyContent: "center",
-    marginBottom: spacing.md,
+    marginRight: 10,
+    marginLeft: 4,
     width: 36,
+  },
+  statContent: {
+    flex: 1,
+    justifyContent: "center",
   },
   statLabel: {
     color: colors.muted,
     fontFamily: typography.medium,
-    fontSize: getResponsiveFontSize(13, 11, 14),
-    marginTop: 6,
+    fontSize: getResponsiveFontSize(11, 10, 12),
+    marginTop: 1,
   },
   statValue: {
     color: colors.text,
     fontFamily: typography.bold,
-    fontSize: getResponsiveFontSize(18, 16, 20),
+    fontSize: getResponsiveFontSize(16, 15, 17),
   },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.md,
+    justifyContent: "space-between",
+    marginTop: spacing.sm,
+    rowGap: spacing.md,
   },
 });

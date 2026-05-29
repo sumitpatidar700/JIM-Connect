@@ -4,6 +4,7 @@ import DateTimePicker, {
 import { useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as WebBrowser from "expo-web-browser";
 import * as DocumentPicker from "expo-document-picker";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -68,6 +69,7 @@ export default function AdminEventsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const profile = useAuthStore((state) => state.profile);
+  const activeSession = useAuthStore((state) => state.activeSession);
   const themeColors = useThemeColors();
   const { t } = useTranslation();
   const scrollRef = useRef<ScrollView>(null);
@@ -114,6 +116,15 @@ export default function AdminEventsScreen() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+
+  const batches = useAuthStore((state) => state.batches);
+  const adminSelectedBatch = useAuthStore((state) => state.adminSelectedBatch);
+  const setAdminSelectedBatch = useAuthStore((state) => state.setAdminSelectedBatch);
+  const fetchBatches = useAuthStore((state) => state.fetchBatches);
+
+  useState(() => {
+    fetchBatches();
+  });
 
   const handleSaveImage = async (uri: string) => {
     try {
@@ -212,7 +223,7 @@ export default function AdminEventsScreen() {
   };
 
   const loadEvents = useCallback(async () => {
-    const rows = await eventService.searchEvents("");
+    const rows = await eventService.searchEvents("", { batchId: adminSelectedBatch?.id ?? null });
     setEvents(rows);
     const eventIds = rows.map((event) => event.id);
     const [counts, gCounts, winnersByEvent] = await Promise.all([
@@ -223,7 +234,7 @@ export default function AdminEventsScreen() {
     setRegistrationCounts(counts);
     setGroupCounts(gCounts);
     setEventWinners(winnersByEvent);
-  }, []);
+  }, [adminSelectedBatch]);
 
   useFocusEffect(
     useCallback(() => {
@@ -524,6 +535,15 @@ export default function AdminEventsScreen() {
   };
 
   const handleSave = async () => {
+    if (!activeSession) {
+      await showAlert({
+        message: "You cannot publish events without an active academic session. Please set one in Settings first.",
+        title: "Publishing disabled",
+        tone: "warning",
+      });
+      return;
+    }
+
     const missing = [];
     if (!(form?.title || "").trim()) missing.push("Event Title");
     if (!(form?.description || "").trim()) missing.push("Description");
@@ -578,6 +598,7 @@ export default function AdminEventsScreen() {
           venue: form.venue,
           committees: form.committees,
           clubs: form.clubs,
+          batchId: adminSelectedBatch?.id ?? null,
         }, onProgress);
       }
       setForm(emptyForm);
@@ -625,6 +646,58 @@ export default function AdminEventsScreen() {
         <Text style={[styles.title, { color: themeColors.text }]}>{t("eventOperations")}</Text>
         <Text style={[styles.subtitle, { color: themeColors.muted }]}>{t("eventOperationsIntro")}</Text>
 
+        <View style={{ marginVertical: spacing.md, gap: spacing.xs }}>
+          <Text style={{ fontSize: 13, fontFamily: typography.semiBold, color: themeColors.text }}>
+            Scope Batch Context (Targets & Filters):
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: 4 }}>
+            <Pressable
+              onPress={() => setAdminSelectedBatch(null)}
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: 6,
+                borderRadius: radii.round,
+                borderWidth: 1.5,
+                borderColor: adminSelectedBatch === null ? themeColors.primary : themeColors.border,
+                backgroundColor: adminSelectedBatch === null ? `${themeColors.primary}15` : themeColors.surfaceAlt,
+              }}
+            >
+              <Text style={{
+                fontSize: 12,
+                fontFamily: adminSelectedBatch === null ? typography.semiBold : typography.medium,
+                color: adminSelectedBatch === null ? themeColors.primary : themeColors.text,
+              }}>
+                All Students
+              </Text>
+            </Pressable>
+            {batches.map((batch) => {
+              const isSelected = adminSelectedBatch?.id === batch.id;
+              return (
+                <Pressable
+                  key={batch.id}
+                  onPress={() => setAdminSelectedBatch(batch)}
+                  style={{
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: 6,
+                    borderRadius: radii.round,
+                    borderWidth: 1.5,
+                    borderColor: isSelected ? themeColors.primary : themeColors.border,
+                    backgroundColor: isSelected ? `${themeColors.primary}15` : themeColors.surfaceAlt,
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 12,
+                    fontFamily: isSelected ? typography.semiBold : typography.medium,
+                    color: isSelected ? themeColors.primary : themeColors.text,
+                  }}>
+                    {batch.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
         <View style={styles.tabsRow}>
           <Pressable
             accessibilityRole="button"
@@ -656,6 +729,22 @@ export default function AdminEventsScreen() {
 
         {activeSection === "create" ? (
         <Panel style={[styles.section, styles.formSection]}>
+          {!activeSession ? (
+            <View
+              style={[
+                styles.editingBanner,
+                {
+                  backgroundColor: themeColors.primarySoft,
+                  borderColor: themeColors.primary,
+                  marginBottom: spacing.md,
+                },
+              ]}
+            >
+              <Text style={[styles.editingText, { color: themeColors.primary }]}>
+                ⚠️ Publishing disabled: There is currently no active academic session. Please create or activate one in Settings first.
+              </Text>
+            </View>
+          ) : null}
           <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
             {form.id ? "Edit event" : "Create event"}
           </Text>
@@ -1006,7 +1095,7 @@ export default function AdminEventsScreen() {
               />
             ) : null}
             <PrimaryButton
-              disabled={!!submitting}
+              disabled={!!submitting || !activeSession}
               loading={!!submitting}
               icon={form.id ? "checkmark" : undefined}
               label={
@@ -1295,6 +1384,8 @@ export default function AdminEventsScreen() {
                         minTeamSize: String(event.min_team_size ?? 1),
                         maxTeamSize: String(event.max_team_size ?? 1),
                         eventType: (event.max_team_size ?? 1) > 1 ? "group" : "solo" as "solo" | "group",
+                        committees: event.committees ?? [],
+                        clubs: event.clubs ?? [],
                       };
                       setForm(nextForm);
                       setInitialForm(nextForm);
@@ -1438,7 +1529,12 @@ export default function AdminEventsScreen() {
                 <PrimaryButton
                   label="Open Document"
                   icon="open"
-                  onPress={() => void Linking.openURL((previewPdfUrl || formPdfPreview)!)}
+                  onPress={() => {
+                    const url = (previewPdfUrl || formPdfPreview)!;
+                    void WebBrowser.openBrowserAsync(
+                      Platform.OS === 'android' ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}` : url
+                    );
+                  }}
                   style={{ width: "100%", backgroundColor: themeColors.primary }}
                 />
               </View>
@@ -1452,6 +1548,19 @@ export default function AdminEventsScreen() {
 }
 
 const styles = StyleSheet.create({
+  editingBanner: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.accentGreen,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  editingText: {
+    color: colors.primary,
+    fontFamily: typography.medium,
+    fontSize: 13,
+  },
   actions: {
     alignItems: "center",
     flexDirection: "row",

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "JI Connect",
+    "name": "JIM Connect",
     "slug": "ji-connect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/jim-logo.png",
+    "icon": "./assets/images/jim-icon.png",
     "scheme": "jiconnect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,9 +13,9 @@
     },
     "android": {
       "package": "com.patidarsumit.jiconnect",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/jim-logo.png",
+        "foregroundImage": "./assets/images/jim-icon.png",
         "backgroundColor": "#FFFFFF"
       },
       "edgeToEdgeEnabled": true,
@@ -23,7 +23,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/jim-logo.png"
+      "favicon": "./assets/images/jim-icon.png"
     },
     "plugins": [
       "expo-router",
@@ -43,12 +43,18 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow JI-Connect to save event images to your photo library.",
-          "savePhotosPermission": "Allow JI-Connect to save event images to your photo library."
+          "photosPermission": "Allow JIM Connect to save event images to your photo library.",
+          "savePhotosPermission": "Allow JIM Connect to save event images to your photo library."
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "production"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

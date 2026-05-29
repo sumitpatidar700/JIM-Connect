@@ -11,6 +11,14 @@ export type UserProfile = {
   name: string;
   phone: string | null;
   role: UserRole;
+  batch_id?: string | null;
+  batch_name?: string | null;
+};
+
+export type Batch = {
+  id: string;
+  name: string;
+  created_at: string;
 };
 
 export type Announcement = {
@@ -18,6 +26,8 @@ export type Announcement = {
   description: string;
   id: string;
   title: string;
+  session_id?: string | null;
+  batch_id?: string | null;
 };
 
 export type EventItem = {
@@ -39,6 +49,8 @@ export type EventItem = {
   venue: string;
   committees?: string[] | null;
   clubs?: string[] | null;
+  session_id?: string | null;
+  batch_id?: string | null;
 };
 
 export type EventTeam = {
@@ -82,6 +94,8 @@ export type WinnerItem = {
   position: string;
   user_id?: string | null;
   users?: Pick<UserProfile, 'avatar_url' | 'name'> | null;
+  session_id?: string | null;
+  batch_id?: string | null;
 };
 
 export type RepositoryItem = {
@@ -117,11 +131,25 @@ export type SupportTicket = {
   users?: Pick<UserProfile, 'name' | 'email' | 'avatar_url'> | null;
 };
 
+export type AcademicSession = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+};
+
 export type AuthState = {
   clearAuthState: () => void;
   isBootstrapping: boolean;
   profile: UserProfile | null;
   session: Session | null;
+  activeSession: AcademicSession | null;
+  batches: Batch[];
+  adminSelectedBatch: Batch | null;
   setAuthState: (payload: { profile: UserProfile | null; session: Session | null }) => void;
   setBootstrapping: (value: boolean) => void;
+  setActiveSession: (activeSession: AcademicSession | null) => void;
+  setBatches: (batches: Batch[]) => void;
+  setAdminSelectedBatch: (batch: Batch | null) => void;
+  fetchBatches: () => Promise<void>;
 };

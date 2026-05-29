@@ -1,10 +1,12 @@
 import { storageService } from '@/src/services/storage-service';
 import { supabase } from '@/src/lib/supabase';
 import { WinnerItem } from '@/src/types/app';
+import { sessionService } from '@/src/services/session-service';
 
 type WinnerPayload = Pick<WinnerItem, 'event_id' | 'name' | 'position'> & {
   imageUri?: string;
   user_id?: string | null;
+  batchId?: string | null;
 };
 
 export const winnerService = {
@@ -28,23 +30,38 @@ export const winnerService = {
     }
 
     const image_url = await storageService.uploadImage('winner-assets', 'winners', payload.imageUri);
+    const activeSession = await sessionService.getActiveSession();
     const { error } = await supabase.from('winners').insert({
       event_id: payload.event_id,
       image_url,
       name: payload.name,
       position: payload.position,
       user_id: payload.user_id,
+      session_id: activeSession?.id ?? null,
+      batch_id: payload.batchId ?? null,
     });
     if (error) {
       throw error;
     }
   },
 
-  async listWinners(): Promise<WinnerItem[]> {
-    const { data, error } = await supabase
-      .from('winners')
-      .select('*, events(title, date, venue), users(name, avatar_url)')
-      .order('position', { ascending: true });
+  async listWinners(batchId?: string | null): Promise<WinnerItem[]> {
+    const activeSession = await sessionService.getActiveSession();
+    let query = supabase.from('winners').select('*, events(title, date, venue), users(name, avatar_url)');
+    
+    if (activeSession) {
+      query = query.eq('session_id', activeSession.id);
+    }
+
+    if (batchId !== undefined) {
+      if (batchId === null) {
+        query = query.is('batch_id', null);
+      } else {
+        query = query.or(`batch_id.is.null,batch_id.eq.${batchId}`);
+      }
+    }
+
+    const { data, error } = await query.order('position', { ascending: true });
     if (error) {
       throw error;
     }

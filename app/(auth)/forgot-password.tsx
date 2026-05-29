@@ -65,6 +65,13 @@ export default function ForgotPasswordScreen() {
               Enter your college email to receive a password reset link.
             </Text>
           </View>
+
+          <View style={{ backgroundColor: "#FEF2F2", borderColor: "#F87171", borderWidth: 1, padding: 12, borderRadius: radii.md, marginBottom: 4 }}>
+            <Text style={{ color: "#991B1B", fontFamily: typography.medium, fontSize: 13, textAlign: "center", lineHeight: 18 }}>
+              Automated email resets are currently disabled (paid feature). Please contact a system administrator or college staff to reset your password.
+            </Text>
+          </View>
+
           <TextField
             autoCapitalize="none"
             autoComplete="email"
@@ -75,10 +82,11 @@ export default function ForgotPasswordScreen() {
             textContentType="emailAddress"
             value={email}
             onChangeText={setEmail}
+            editable={false}
           />
           <PrimaryButton
-            disabled={!email || submitting}
-            label={submitting ? "Sending..." : "Send Reset Link"}
+            disabled={true}
+            label="Service Unavailable"
             onPress={handleReset}
           />
           <Link href="/(auth)/login" style={styles.link}>

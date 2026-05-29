@@ -42,7 +42,7 @@ const bentoCards = [
 export default function HomeScreen({ navigation }: any) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
-      <Text style={styles.header}>Welcome to JI-Connect</Text>
+      <Text style={styles.header}>Welcome to JIM Connect</Text>
       <View style={styles.grid}>
         {bentoCards.map((card, idx) => (
           <TouchableOpacity

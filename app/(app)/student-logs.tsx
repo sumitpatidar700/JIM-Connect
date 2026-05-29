@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { LogDetailModal } from "@/components/ui/LogDetailModal";
 import { Panel } from "@/components/ui/Panel";
 import { Screen } from "@/components/ui/Screen";
 import { useAnnouncementsQuery } from "@/src/hooks/queries/useAnnouncementsQuery";
@@ -29,6 +30,7 @@ type LogItem = {
   color: string;
   date: Date;
   type: 'announcement' | 'event' | 'winner';
+  rawItem?: any;
 };
 
 export default function StudentLogsScreen() {
@@ -38,6 +40,7 @@ export default function StudentLogsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "events" | "notices" | "winners">("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [selectedLog, setSelectedLog] = useState<LogItem | null>(null);
 
   const { data: announcements = [], isLoading: al, refetch: ar } = useAnnouncementsQuery();
   const { data: events = [], isLoading: el, refetch: er } = useEventSearchQuery("");
@@ -63,7 +66,8 @@ export default function StudentLogsScreen() {
         icon: "megaphone.fill",
         color: themeColors.accentBlue,
         date: new Date(a.created_at),
-        type: 'announcement'
+        type: 'announcement',
+        rawItem: a
       });
     });
 
@@ -82,7 +86,8 @@ export default function StudentLogsScreen() {
         icon: isPast ? "calendar" : (isRegClosed ? "lock.fill" : "calendar.badge.plus"),
         color: isRegClosed ? themeColors.muted : themeColors.accentAmber,
         date: new Date(e.created_at),
-        type: 'event'
+        type: 'event',
+        rawItem: e
       });
     });
 
@@ -96,7 +101,8 @@ export default function StudentLogsScreen() {
         icon: "star.fill",
         color: themeColors.accentGreen,
         date: new Date(w.created_at || Date.now()),
-        type: 'winner'
+        type: 'winner',
+        rawItem: w
       });
     });
 
@@ -218,21 +224,29 @@ export default function StudentLogsScreen() {
              <Text style={[styles.sectionTitle, { color: themeColors.muted }]}>{title}</Text>
           </View>
         )}
-        renderItem={({ item }) => (
-          <Panel style={styles.logCard}>
-            <View style={[styles.iconWrap, { backgroundColor: item.color }]}>
-              <IconSymbol name={item.icon} color={themeColors.text} size={18} />
-            </View>
-            <View style={styles.logText}>
-              <Text style={[styles.logTitle, { color: themeColors.text }]} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <Text style={[styles.logSubtitle, { color: themeColors.muted }]} numberOfLines={1}>
-                {item.subtitle} • {item.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-            </View>
-          </Panel>
-        )}
+        renderItem={({ item }) => {
+          const handlePress = () => {
+            setSelectedLog(item);
+          };
+
+          return (
+            <TouchableOpacity activeOpacity={0.7} onPress={handlePress}>
+              <Panel style={styles.logCard}>
+                <View style={[styles.iconWrap, { backgroundColor: item.color }]}>
+                  <IconSymbol name={item.icon} color={themeColors.text} size={18} />
+                </View>
+                <View style={styles.logText}>
+                  <Text style={[styles.logTitle, { color: themeColors.text }]} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.logSubtitle, { color: themeColors.muted }]} numberOfLines={1}>
+                    {item.subtitle} • {item.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+              </Panel>
+            </TouchableOpacity>
+          );
+        }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <IconSymbol name="search" color={themeColors.muted} size={48} />
@@ -241,6 +255,12 @@ export default function StudentLogsScreen() {
             </Text>
           </View>
         }
+      />
+      
+      <LogDetailModal 
+        visible={!!selectedLog} 
+        logItem={selectedLog} 
+        onClose={() => setSelectedLog(null)} 
       />
     </Screen>
   );

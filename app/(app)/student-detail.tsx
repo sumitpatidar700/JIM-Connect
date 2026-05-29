@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Image,
   Linking,
@@ -17,10 +18,13 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { Screen } from "@/components/ui/Screen";
+import { queryKeys } from "@/src/hooks/queries/query-keys";
 import { useUserRegistrationsQuery } from "@/src/hooks/queries/useUserRegistrationsQuery";
 import { useAuthStore } from "@/src/store/auth-store";
 import { useProfileQuery } from "@/src/hooks/queries/useProfileQuery";
 import { useWinnersQuery } from "@/src/hooks/queries/useWinnersQuery";
+import { batchService } from "@/src/services/batch-service";
+import { useAppFeedback } from "@/src/providers/app-feedback-provider";
 import { colors, radii, spacing, typography } from "@/src/theme/tokens";
 import { formatEventDate } from "@/src/utils/format";
 import { useThemeColors } from "@/src/utils/settings-effects";
@@ -30,8 +34,13 @@ export default function StudentDetailScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const themeColors = useThemeColors();
   const currentUser = useAuthStore((state) => state.profile);
+  const { showAlert } = useAppFeedback();
+  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<"registrations" | "winnings">("registrations");
+  const [savingBatch, setSavingBatch] = useState(false);
+  const batches = useAuthStore((state) => state.batches);
+  const fetchBatches = useAuthStore((state) => state.fetchBatches);
 
   const { data: student, isLoading: usersLoading } = useProfileQuery(userId);
   const { data: registrations = [], isLoading: registrationsLoading } = useUserRegistrationsQuery(userId);
@@ -42,6 +51,13 @@ export default function StudentDetailScreen() {
     const sName = student.name.toLowerCase().trim();
     return allWinners.filter((w) => w.name.toLowerCase().trim() === sName);
   }, [allWinners, student]);
+
+  // Load batches list on mount if admin
+  useState(() => {
+    if (currentUser?.role === "admin") {
+      fetchBatches();
+    }
+  });
 
   if (usersLoading || registrationsLoading || winnersLoading) {
     return <LoadingState fullScreen message="Retrieving student profile & event records..." />;
@@ -115,6 +131,27 @@ export default function StudentDetailScreen() {
     year: "numeric",
   }).format(new Date(student.created_at));
 
+  const handleUpdateBatch = async (batchId: string | null) => {
+    try {
+      setSavingBatch(true);
+      await batchService.updateUserBatch(userId, batchId);
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.users, 'profile', userId] });
+      await showAlert({
+        title: "Batch Reassigned",
+        message: "Student batch updated successfully.",
+        tone: "success",
+      });
+    } catch (err: any) {
+      await showAlert({
+        title: "Reassignment Failed",
+        message: err instanceof Error ? err.message : "An unexpected error occurred.",
+        tone: "error",
+      });
+    } finally {
+      setSavingBatch(false);
+    }
+  };
+
   return (
     <Screen scrollable>
       {/* Top Bar */}
@@ -152,15 +189,62 @@ export default function StudentDetailScreen() {
           </View>
           <Text style={[styles.studentName, { color: themeColors.text }]}>{student.name}</Text>
           <Text style={[styles.studentEmail, { color: themeColors.muted }]}>{student.email}</Text>
-          {student.phone && (
+          
+          <View style={{ flexDirection: "row", gap: spacing.xs, alignItems: "center", marginTop: 4 }}>
             <View style={styles.phoneBadge}>
-              <IconSymbol color={themeColors.primary} name="paperplane.fill" size={14} />
+              <IconSymbol color={themeColors.primary} name="bookmark.fill" size={12} />
               <Text style={[styles.studentPhone, { color: themeColors.primary }]}>
-                +91 {student.phone}
+                Batch: {student.batch_name || "None / All"}
               </Text>
             </View>
-          )}
+            
+            {student.phone && (
+              <View style={styles.phoneBadge}>
+                <IconSymbol color={themeColors.primary} name="paperplane.fill" size={14} />
+                <Text style={[styles.studentPhone, { color: themeColors.primary }]}>
+                  +91 {student.phone}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
+
+        {currentUser?.role === "admin" && (
+          <View style={{ marginTop: spacing.md, paddingHorizontal: spacing.sm }}>
+            <Text style={{ fontSize: 13, fontFamily: typography.semiBold, color: themeColors.text, marginBottom: 8 }}>
+              Reassign Academic Batch (Admin Only):
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+              {batches.map((batch) => {
+                const isSelected = student.batch_id === batch.id;
+                return (
+                  <TouchableOpacity
+                    key={batch.id}
+                    disabled={savingBatch}
+                    onPress={() => handleUpdateBatch(batch.id)}
+                    style={{
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: 6,
+                      borderRadius: radii.round,
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? themeColors.primary : themeColors.border,
+                      backgroundColor: isSelected ? `${themeColors.primary}15` : themeColors.surfaceAlt,
+                      opacity: savingBatch ? 0.6 : 1
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 12,
+                      fontFamily: isSelected ? typography.semiBold : typography.medium,
+                      color: isSelected ? themeColors.primary : themeColors.text,
+                    }}>
+                      {batch.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
 

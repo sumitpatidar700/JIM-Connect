@@ -15,6 +15,7 @@ import { colors, radii, spacing, typography } from "@/src/theme/tokens";
 import { formatEventDate } from "@/src/utils/format";
 import { useTranslation } from "@/src/utils/i18n";
 import { useThemeColors } from "@/src/utils/settings-effects";
+import { useAuthStore } from "@/src/store/auth-store";
 
 // Position color mapping function
 const getPositionColor = (position: string) => {
@@ -73,6 +74,7 @@ export default function WinnersScreen() {
   const { t } = useTranslation();
   const { isItemNewOnScreen, markItemAsSeen } = useBadgeStore();
   const [searchQuery, setSearchQuery] = useState("");
+  const activeSession = useAuthStore((state) => state.activeSession);
 
   // Group winners by events and filter by search
   const { groupedWinners, filteredEvents } = useMemo(() => {
@@ -124,6 +126,16 @@ export default function WinnersScreen() {
       <Text style={[styles.subtitle, { color: themeColors.muted }]}>
         {t("winnersIntro")}
       </Text>
+      {activeSession?.name ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8, marginTop: 4 }}>
+          <View style={{ backgroundColor: themeColors.primarySoft, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <IconSymbol color={themeColors.primary} name="calendar" size={11} />
+            <Text style={{ fontFamily: typography.semiBold, fontSize: 11, color: themeColors.primary }}>
+              Session: {activeSession.name}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {/* Search Bar */}
       <View style={styles.searchWrapper}>

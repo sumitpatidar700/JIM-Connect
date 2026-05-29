@@ -20,6 +20,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SplashScreenView } from "@/components/ui/SplashScreenView";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuthBootstrap } from "@/src/hooks/useAuthBootstrap";
+import { useOneSignal } from "@/src/hooks/useOneSignal";
 import { queryClient } from "@/src/lib/query-client";
 import { AppFeedbackProvider } from "@/src/providers/app-feedback-provider";
 import { useAuthStore } from "@/src/store/auth-store";
@@ -32,6 +33,7 @@ export default function RootLayout() {
   const themeMode = useAppSettingsStore((state) => state.themeMode);
   const effectiveColorScheme = themeMode === "system" ? colorScheme : themeMode;
   useAuthBootstrap();
+  useOneSignal();
 
   useFonts({
     Manrope_400Regular,

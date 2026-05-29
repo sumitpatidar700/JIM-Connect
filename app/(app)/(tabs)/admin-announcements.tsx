@@ -51,9 +51,20 @@ export default function AdminAnnouncementsScreen() {
   const queryClient = useQueryClient();
   const { showAlert, showConfirm } = useAppFeedback();
   const profile = useAuthStore((state) => state.profile);
+  const activeSession = useAuthStore((state) => state.activeSession);
   const themeColors = useThemeColors();
   const { t } = useTranslation();
   const scrollRef = useRef<ScrollView>(null);
+
+  const batches = useAuthStore((state) => state.batches);
+  const adminSelectedBatch = useAuthStore((state) => state.adminSelectedBatch);
+  const setAdminSelectedBatch = useAuthStore((state) => state.setAdminSelectedBatch);
+  const fetchBatches = useAuthStore((state) => state.fetchBatches);
+
+  useState(() => {
+    fetchBatches();
+  });
+
   const {
     data: announcements = [],
     isLoading: loading,
@@ -139,6 +150,15 @@ export default function AdminAnnouncementsScreen() {
   }
 
   const handleSave = async () => {
+    if (!activeSession) {
+      await showAlert({
+        message: "You cannot publish notices without an active academic session. Please set one in Settings first.",
+        title: "Publishing disabled",
+        tone: "warning",
+      });
+      return;
+    }
+
     if (!trimmedTitle || !trimmedDescription) {
       await showAlert({
         message: "Add both a title and description.",
@@ -159,11 +179,12 @@ export default function AdminAnnouncementsScreen() {
         await announcementService.createAnnouncement({
           description: trimmedDescription,
           title: trimmedTitle,
+          batch_id: adminSelectedBatch?.id ?? null,
         });
       }
       setForm({ description: "", id: "", title: "" });
       Keyboard.dismiss();
-      await queryClient.invalidateQueries({ queryKey: queryKeys.announcements });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.announcements(adminSelectedBatch?.id ?? null) });
       await refetchAnnouncements();
       setActiveSection("view");
       requestAnimationFrame(() => {
@@ -233,6 +254,58 @@ export default function AdminAnnouncementsScreen() {
         <Text style={[styles.title, { color: themeColors.text }]}>{t("announcementDesk")}</Text>
         <Text style={[styles.subtitle, { color: themeColors.muted }]}>{t("announcementDeskIntro")}</Text>
 
+        <View style={{ marginVertical: spacing.md, gap: spacing.xs }}>
+          <Text style={{ fontSize: 13, fontFamily: typography.semiBold, color: themeColors.text }}>
+            Scope Batch Context (Targets & Filters):
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: 4 }}>
+            <Pressable
+              onPress={() => setAdminSelectedBatch(null)}
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: 6,
+                borderRadius: radii.round,
+                borderWidth: 1.5,
+                borderColor: adminSelectedBatch === null ? themeColors.primary : themeColors.border,
+                backgroundColor: adminSelectedBatch === null ? `${themeColors.primary}15` : themeColors.surfaceAlt,
+              }}
+            >
+              <Text style={{
+                fontSize: 12,
+                fontFamily: adminSelectedBatch === null ? typography.semiBold : typography.medium,
+                color: adminSelectedBatch === null ? themeColors.primary : themeColors.text,
+              }}>
+                All Students
+              </Text>
+            </Pressable>
+            {batches.map((batch) => {
+              const isSelected = adminSelectedBatch?.id === batch.id;
+              return (
+                <Pressable
+                  key={batch.id}
+                  onPress={() => setAdminSelectedBatch(batch)}
+                  style={{
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: 6,
+                    borderRadius: radii.round,
+                    borderWidth: 1.5,
+                    borderColor: isSelected ? themeColors.primary : themeColors.border,
+                    backgroundColor: isSelected ? `${themeColors.primary}15` : themeColors.surfaceAlt,
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 12,
+                    fontFamily: isSelected ? typography.semiBold : typography.medium,
+                    color: isSelected ? themeColors.primary : themeColors.text,
+                  }}>
+                    {batch.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
         <View style={styles.tabsRow}>
           <Pressable
             accessibilityRole="button"
@@ -283,6 +356,22 @@ export default function AdminAnnouncementsScreen() {
             </View>
 
             <View style={styles.formBody}>
+                {!activeSession ? (
+                  <View
+                    style={[
+                      styles.editingBanner,
+                      {
+                        backgroundColor: themeColors.primarySoft,
+                        borderColor: themeColors.primary,
+                        marginBottom: spacing.md,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.editingText, { color: themeColors.primary }]}>
+                      ⚠️ Publishing disabled: There is currently no active academic session. Please create or activate one in Settings first.
+                    </Text>
+                  </View>
+                ) : null}
                 {form.id ? (
                   <View
                     style={[
@@ -365,7 +454,7 @@ export default function AdminAnnouncementsScreen() {
                     />
                   ) : null}
                   <PrimaryButton
-                    disabled={!isFormReady || submitting}
+                    disabled={!isFormReady || submitting || !activeSession}
                     loading={submitting}
                     icon={form.id ? "checkmark" : undefined}
                     label={
@@ -500,7 +589,7 @@ export default function AdminAnnouncementsScreen() {
                         }
                         await announcementService.deleteAnnouncement(announcement.id);
                         await queryClient.invalidateQueries({
-                          queryKey: queryKeys.announcements,
+                          queryKey: queryKeys.announcements(adminSelectedBatch?.id ?? null),
                         });
                         await refetchAnnouncements();
                       }}

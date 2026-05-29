@@ -22,6 +22,7 @@ import { formatEventDate } from "@/src/utils/format";
 import { useTranslation } from "@/src/utils/i18n";
 import { useThemeColors } from "@/src/utils/settings-effects";
 import { colors, radii, spacing, typography } from "@/src/theme/tokens";
+import { useAuthStore } from "@/src/store/auth-store";
 
 type SortOption = "newest" | "oldest" | "az";
 
@@ -34,6 +35,7 @@ export default function NoticesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const activeSession = useAuthStore((state) => state.activeSession);
 
   const processedAnnouncements = useMemo(() => {
     let result = [...announcements];
@@ -94,6 +96,16 @@ export default function NoticesScreen() {
           <Text style={[styles.introText, { color: themeColors.muted }]}>
             Official campus updates and academic notices for students.
           </Text>
+          {activeSession?.name ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <View style={{ backgroundColor: themeColors.primarySoft, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <IconSymbol color={themeColors.primary} name="calendar" size={11} />
+                <Text style={{ fontFamily: typography.semiBold, fontSize: 11, color: themeColors.primary }}>
+                  Session: {activeSession.name}
+                </Text>
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
 

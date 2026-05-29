@@ -63,8 +63,19 @@ export default function AdminResultsScreen() {
   const queryClient = useQueryClient();
   const { showAlert, showConfirm } = useAppFeedback();
   const profile = useAuthStore((state) => state.profile);
+  const activeSession = useAuthStore((state) => state.activeSession);
   const themeColors = useThemeColors();
   const { t } = useTranslation();
+
+  const batches = useAuthStore((state) => state.batches);
+  const adminSelectedBatch = useAuthStore((state) => state.adminSelectedBatch);
+  const setAdminSelectedBatch = useAuthStore((state) => state.setAdminSelectedBatch);
+  const fetchBatches = useAuthStore((state) => state.fetchBatches);
+
+  useState(() => {
+    fetchBatches();
+  });
+
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventFilter, setEventFilter] = useState<ResultEventFilter>("all");
   const [eventSearch, setEventSearch] = useState("");
@@ -105,8 +116,8 @@ export default function AdminResultsScreen() {
   );
   const loadData = useCallback(async () => {
     const [eventRows, winnerRows, repositoryRows] = await Promise.all([
-      eventService.searchEvents(""),
-      winnerService.listWinners(),
+      eventService.searchEvents("", { batchId: adminSelectedBatch?.id ?? null }),
+      winnerService.listWinners(adminSelectedBatch?.id ?? null),
       repositoryService.listRepositoryItems(),
     ]);
     const nextEventId = selectedEventId ?? eventRows[0]?.id ?? null;
@@ -123,7 +134,7 @@ export default function AdminResultsScreen() {
         registrationRows.some((row) => row.id === winner.registrationId),
       ),
     );
-  }, [selectedEventId]);
+  }, [selectedEventId, adminSelectedBatch]);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === selectedEventId) ?? null,
@@ -380,6 +391,15 @@ export default function AdminResultsScreen() {
   };
 
   const publishWinners = async () => {
+    if (!activeSession) {
+      await showAlert({
+        message: "You cannot publish results without an active academic session. Please set one in Settings first.",
+        title: "Publishing disabled",
+        tone: "warning",
+      });
+      return;
+    }
+
     if (!selectedEventId || !winnersReady) {
       await showAlert({
         message: "Choose an event, add one or more registered candidates, and fill every position.",
@@ -429,12 +449,13 @@ export default function AdminResultsScreen() {
             name: winner.name,
             position: winner.position,
             user_id: winner.userId,
+            batchId: adminSelectedBatch?.id ?? null,
           }),
         ),
       );
       setDraftWinners([]);
       setCandidateSearch("");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.winners });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.winners(adminSelectedBatch?.id ?? null) });
       await loadData();
     } catch (error) {
       await showAlert({
@@ -448,6 +469,15 @@ export default function AdminResultsScreen() {
   };
 
   const publishRepositoryItem = async () => {
+    if (!activeSession) {
+      await showAlert({
+        message: "You cannot add archive items without an active academic session. Please set one in Settings first.",
+        title: "Publishing disabled",
+        tone: "warning",
+      });
+      return;
+    }
+
     if (!selectedEventId || !repositoryForm.description) {
       await showAlert({
         message: "Choose an event and add archive text.",
@@ -492,7 +522,7 @@ export default function AdminResultsScreen() {
         position: editingWinner.position,
       });
       setEditingWinner(null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.winners });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.winners(adminSelectedBatch?.id ?? null) });
       await loadData();
       await showAlert({
         message: "Winner successfully updated.",
@@ -521,7 +551,7 @@ export default function AdminResultsScreen() {
     try {
       setSubmitting(true);
       await winnerService.deleteWinner(winnerId);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.winners });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.winners(adminSelectedBatch?.id ?? null) });
       await loadData();
       await showAlert({
         message: "Winner successfully removed.",
@@ -550,6 +580,58 @@ export default function AdminResultsScreen() {
         <Text style={[styles.subtitle, { color: themeColors.muted, marginBottom: spacing.xs }]}>
           {t("resultsStudioIntro")}
         </Text>
+
+        <View style={{ marginVertical: spacing.md, gap: spacing.xs }}>
+          <Text style={{ fontSize: 13, fontFamily: typography.semiBold, color: themeColors.text }}>
+            Scope Batch Context (Targets & Filters):
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: 4 }}>
+            <Pressable
+              onPress={() => setAdminSelectedBatch(null)}
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: 6,
+                borderRadius: radii.round,
+                borderWidth: 1.5,
+                borderColor: adminSelectedBatch === null ? themeColors.primary : themeColors.border,
+                backgroundColor: adminSelectedBatch === null ? `${themeColors.primary}15` : themeColors.surfaceAlt,
+              }}
+            >
+              <Text style={{
+                fontSize: 12,
+                fontFamily: adminSelectedBatch === null ? typography.semiBold : typography.medium,
+                color: adminSelectedBatch === null ? themeColors.primary : themeColors.text,
+              }}>
+                All Students
+              </Text>
+            </Pressable>
+            {batches.map((batch) => {
+              const isSelected = adminSelectedBatch?.id === batch.id;
+              return (
+                <Pressable
+                  key={batch.id}
+                  onPress={() => setAdminSelectedBatch(batch)}
+                  style={{
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: 6,
+                    borderRadius: radii.round,
+                    borderWidth: 1.5,
+                    borderColor: isSelected ? themeColors.primary : themeColors.border,
+                    backgroundColor: isSelected ? `${themeColors.primary}15` : themeColors.surfaceAlt,
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 12,
+                    fontFamily: isSelected ? typography.semiBold : typography.medium,
+                    color: isSelected ? themeColors.primary : themeColors.text,
+                  }}>
+                    {batch.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
         <View style={{ flexDirection: "row", gap: 12, marginBottom: spacing.md }}>
           <PrimaryButton
@@ -716,6 +798,22 @@ export default function AdminResultsScreen() {
         </Panel>
 
         <Panel style={[styles.section, styles.formSection]}>
+          {!activeSession ? (
+            <View
+              style={[
+                styles.editingBanner,
+                {
+                  backgroundColor: themeColors.primarySoft,
+                  borderColor: themeColors.primary,
+                  marginBottom: spacing.md,
+                },
+              ]}
+            >
+              <Text style={[styles.editingText, { color: themeColors.primary }]}>
+                ⚠️ Publishing disabled: There is currently no active academic session. Please create or activate one in Settings first.
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.sectionHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sectionTitle, { color: themeColors.text, marginBottom: 4 }]}>Publish winners</Text>
@@ -830,7 +928,7 @@ export default function AdminResultsScreen() {
           )}
           <View style={styles.formActions}>
             <PrimaryButton
-              disabled={!winnersReady || !canDeclareResults || submitting}
+              disabled={!winnersReady || !canDeclareResults || submitting || !activeSession}
               icon="checkmark"
               label={submitting ? "Publishing..." : `Publish ${draftWinners.length || ""} Winner${draftWinners.length === 1 ? "" : "s"}`}
               onPress={publishWinners}
@@ -839,6 +937,22 @@ export default function AdminResultsScreen() {
         </Panel>
 
         <Panel style={[styles.section, styles.formSection]}>
+          {!activeSession ? (
+            <View
+              style={[
+                styles.editingBanner,
+                {
+                  backgroundColor: themeColors.primarySoft,
+                  borderColor: themeColors.primary,
+                  marginBottom: spacing.md,
+                },
+              ]}
+            >
+              <Text style={[styles.editingText, { color: themeColors.primary }]}>
+                ⚠️ Publishing disabled: There is currently no active academic session. Please create or activate one in Settings first.
+              </Text>
+            </View>
+          ) : null}
           <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Archive event</Text>
           <TextField
             label="Archive Description"
@@ -858,7 +972,7 @@ export default function AdminResultsScreen() {
           />
           <View style={styles.formActions}>
             <PrimaryButton
-              disabled={!repositoryFormReady || submitting}
+              disabled={!repositoryFormReady || submitting || !activeSession}
               icon="plus"
               label="Add Archive Item"
               onPress={publishRepositoryItem}
@@ -1053,6 +1167,19 @@ export default function AdminResultsScreen() {
 }
 
 const styles = StyleSheet.create({
+  editingBanner: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.accentGreen,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  editingText: {
+    color: colors.primary,
+    fontFamily: typography.medium,
+    fontSize: 13,
+  },
   candidateCard: {
     alignItems: "center",
     backgroundColor: colors.background,

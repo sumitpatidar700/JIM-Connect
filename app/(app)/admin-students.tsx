@@ -30,16 +30,10 @@ export default function AdminStudentsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const { data: users = [], isLoading, refetch } = useUsersQuery(deferredSearchQuery);
-  const [activeFilter, setActiveFilter] = useState<"all" | "admin" | "student">("all");
   const [sortOrder, setSortOrder] = useState<"az" | "za" | "newest">("az");
 
   const filteredUsers = useMemo(() => {
     let result = [...users];
-
-    // Filter by Role
-    if (activeFilter !== "all") {
-      result = result.filter(u => u.role === activeFilter);
-    }
 
     // Sort
     result.sort((a, b) => {
@@ -50,7 +44,7 @@ export default function AdminStudentsScreen() {
     });
 
     return result;
-  }, [users, searchQuery, activeFilter, sortOrder]);
+  }, [users, sortOrder]);
 
   const handleCall = (phone?: string | null) => {
     if (phone) {
@@ -93,7 +87,7 @@ export default function AdminStudentsScreen() {
             Student Directory
           </Text>
           <Text style={[styles.tagline, { color: themeColors.muted }]}>
-            Managing {users.length} registered campus profiles.
+            Managing {users.length} registered student profiles.
           </Text>
         </View>
       </View>
@@ -112,25 +106,9 @@ export default function AdminStudentsScreen() {
       </Panel>
 
       <View style={styles.filterRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-          {(["all", "student", "admin"] as const).map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              onPress={() => setActiveFilter(filter)}
-              style={[
-                styles.filterChip,
-                activeFilter === filter && { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
-              ]}
-            >
-              <Text style={[
-                styles.filterChipText, 
-                { color: activeFilter === filter ? themeColors.white : themeColors.muted }
-              ]}>
-                {filter === "all" ? "All" : filter === "student" ? "Students" : "Staff"}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <Text style={{ fontSize: 13, fontFamily: typography.medium, color: themeColors.muted, flex: 1 }}>
+          Showing {filteredUsers.length} student profiles
+        </Text>
         <TouchableOpacity 
           onPress={() => {
             const orders: ("az" | "za" | "newest")[] = ["az", "za", "newest"];
@@ -139,11 +117,16 @@ export default function AdminStudentsScreen() {
           }}
           style={[styles.sortButton, { backgroundColor: themeColors.surfaceAlt }]}
         >
-          <IconSymbol 
-            name={sortOrder === "az" ? "arrow-down" : sortOrder === "za" ? "arrow-up" : "clock"} 
-            color={themeColors.text} 
-            size={18} 
-          />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12 }}>
+            <IconSymbol 
+              name={sortOrder === "az" ? "arrow-down" : sortOrder === "za" ? "arrow-up" : "clock"} 
+              color={themeColors.text} 
+              size={14} 
+            />
+            <Text style={{ fontSize: 12, fontFamily: typography.semiBold, color: themeColors.text }}>
+              {sortOrder === "az" ? "A-Z" : sortOrder === "za" ? "Z-A" : "Newest"}
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -173,14 +156,23 @@ export default function AdminStudentsScreen() {
                   <Text style={[styles.studentEmail, { color: themeColors.muted }]}>
                     {user.email}
                   </Text>
-                  {user.phone && (
-                    <View style={styles.phoneRow}>
-                      <IconSymbol color={themeColors.muted} name="paperplane.fill" size={12} />
-                      <Text style={[styles.studentPhone, { color: themeColors.muted }]}>
-                        {user.phone}
-                      </Text>
-                    </View>
-                  )}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    {user.batch_name && (
+                      <View style={{ backgroundColor: `${themeColors.primary}15`, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                        <Text style={{ fontSize: 10, fontFamily: typography.semiBold, color: themeColors.primary }}>
+                          {user.batch_name}
+                        </Text>
+                      </View>
+                    )}
+                    {user.phone && (
+                      <View style={styles.phoneRow}>
+                        <IconSymbol color={themeColors.muted} name="paperplane.fill" size={12} />
+                        <Text style={[styles.studentPhone, { color: themeColors.muted }]}>
+                          {user.phone}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
 
@@ -297,9 +289,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   sortButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    height: 38,
+    borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
   },

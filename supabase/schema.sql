@@ -27,6 +27,9 @@ where phone is not null and phone <> '';
 alter table public.users
 add column if not exists avatar_url text;
 
+alter table public.users
+add column if not exists onesignal_id text;
+
 create table if not exists public.announcements (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -129,13 +132,17 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.users (id, name, email, phone, role)
+  -- Revert trigger to a safe execution context.
+  -- We don't perform conditional blocks here since a 500 error blocks auth creation.
+  -- Instead, we let auth insert proceed.
+  insert into public.users (id, name, email, phone, role, email_confirmed)
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1)),
     new.email,
     nullif(new.raw_user_meta_data ->> 'phone', ''),
-    'student'
+    'student',
+    coalesce(new.email_confirmed, false)
   )
   on conflict (id) do update
   set
@@ -391,3 +398,41 @@ drop policy if exists "support_tickets_delete_admin" on public.support_tickets;
 create policy "support_tickets_delete_admin"
 on public.support_tickets for delete
 using (public.is_admin());
+
+-- Create sessions table
+create table if not exists public.sessions (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  is_active boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Ensure only one session can be active at a time
+create unique index if not exists sessions_active_idx 
+on public.sessions (is_active) 
+where (is_active = true);
+
+-- Add session_id columns
+alter table public.events 
+add column if not exists session_id uuid references public.sessions (id) on delete set null;
+
+alter table public.announcements 
+add column if not exists session_id uuid references public.sessions (id) on delete set null;
+
+alter table public.winners 
+add column if not exists session_id uuid references public.sessions (id) on delete set null;
+
+-- Enable RLS
+alter table public.sessions enable row level security;
+
+-- RLS Policies
+drop policy if exists "sessions_read_all" on public.sessions;
+create policy "sessions_read_all"
+on public.sessions for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists "sessions_admin_manage" on public.sessions;
+create policy "sessions_admin_manage"
+on public.sessions for all
+using (public.is_admin())
+with check (public.is_admin());

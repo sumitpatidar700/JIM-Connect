@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { LogDetailModal } from "@/components/ui/LogDetailModal";
 import { Panel } from "@/components/ui/Panel";
 import { Screen } from "@/components/ui/Screen";
 import { useAnnouncementsQuery } from "@/src/hooks/queries/useAnnouncementsQuery";
@@ -30,6 +31,8 @@ type LogItem = {
   icon: React.ComponentProps<typeof IconSymbol>["name"];
   color: string;
   date: Date;
+  type: 'announcement' | 'registration' | 'user';
+  rawItem?: any;
 };
 
 export default function AdminLogsScreen() {
@@ -39,6 +42,7 @@ export default function AdminLogsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "students" | "events" | "notices">("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [selectedLog, setSelectedLog] = useState<LogItem | null>(null);
 
   const { data: announcements = [], isLoading: al, refetch: ar } = useAnnouncementsQuery();
   const { data: events = [], isLoading: el, refetch: er } = useEventSearchQuery("");
@@ -64,7 +68,9 @@ export default function AdminLogsScreen() {
         subtitle: "System Broadcast",
         icon: "megaphone.fill",
         color: themeColors.accentBlue,
-        date: new Date(a.created_at)
+        date: new Date(a.created_at),
+        type: 'announcement',
+        rawItem: a
       });
     });
 
@@ -76,7 +82,9 @@ export default function AdminLogsScreen() {
         subtitle: r.events?.title || "Event Registration",
         icon: "checkmark",
         color: themeColors.primary,
-        date: new Date(r.created_at)
+        date: new Date(r.created_at),
+        type: 'registration',
+        rawItem: r
       });
     });
 
@@ -88,7 +96,9 @@ export default function AdminLogsScreen() {
         subtitle: u.email,
         icon: "person.badge.plus",
         color: themeColors.accentGreen,
-        date: new Date(u.created_at)
+        date: new Date(u.created_at),
+        type: 'user',
+        rawItem: u
       });
     });
 
@@ -210,21 +220,29 @@ export default function AdminLogsScreen() {
              <Text style={[styles.sectionTitle, { color: themeColors.muted }]}>{title}</Text>
           </View>
         )}
-        renderItem={({ item }) => (
-          <Panel style={styles.logCard}>
-            <View style={[styles.iconWrap, { backgroundColor: item.color }]}>
-              <IconSymbol name={item.icon} color={themeColors.text} size={20} />
-            </View>
-            <View style={styles.logText}>
-              <Text style={[styles.logTitle, { color: themeColors.text }]} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <Text style={[styles.logSubtitle, { color: themeColors.muted }]} numberOfLines={1}>
-                {item.subtitle} • {item.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-            </View>
-          </Panel>
-        )}
+        renderItem={({ item }) => {
+          const handlePress = () => {
+            setSelectedLog(item);
+          };
+
+          return (
+            <TouchableOpacity activeOpacity={0.7} onPress={handlePress}>
+              <Panel style={styles.logCard}>
+                <View style={[styles.iconWrap, { backgroundColor: item.color }]}>
+                  <IconSymbol name={item.icon} color={themeColors.text} size={20} />
+                </View>
+                <View style={styles.logText}>
+                  <Text style={[styles.logTitle, { color: themeColors.text }]} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.logSubtitle, { color: themeColors.muted }]} numberOfLines={1}>
+                    {item.subtitle} • {item.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+              </Panel>
+            </TouchableOpacity>
+          );
+        }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <IconSymbol name="search" color={themeColors.muted} size={48} />
@@ -233,6 +251,12 @@ export default function AdminLogsScreen() {
             </Text>
           </View>
         }
+      />
+      
+      <LogDetailModal 
+        visible={!!selectedLog} 
+        logItem={selectedLog} 
+        onClose={() => setSelectedLog(null)} 
       />
     </Screen>
   );
