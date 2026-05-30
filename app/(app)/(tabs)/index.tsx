@@ -152,7 +152,7 @@ export default function HomeScreen() {
       announcementService.unsubscribe(announcementsChannel);
       eventService.unsubscribe(eventsChannel);
     };
-  }, [queryClient, refetchEvents]);
+  }, [queryClient, refetchEvents, profile?.batch_id]);
 
 
   const quickActions = useMemo<QuickAction[]>(

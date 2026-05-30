@@ -4,7 +4,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share, PanResponder } from 'react-native';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,12 +48,24 @@ export default function EventDetailsScreen() {
   const userId = profile?.id;
   const isAdmin = profile?.role === 'admin';
   const eventId = id ?? '';
-  const { data: event = null, isLoading: eventLoading } = useEventByIdQuery(eventId);
+  const { data: event = null, isLoading: eventLoading, refetch: refetchEvent } = useEventByIdQuery(eventId);
   const { data: registrations = [], isLoading: registeredLoading } =
     useRegisteredEventsQuery(userId);
-  const { data: registrationCounts = {} } = useRegistrationCountsQuery(
+  const { data: registrationCounts = {}, refetch: refetchRegistrationCounts } = useRegistrationCountsQuery(
     eventId ? [eventId] : [],
   );
+
+  useEffect(() => {
+    const channel = eventService.subscribeToEvents(() => {
+      void queryClient.invalidateQueries({ queryKey: ["events"] });
+      void refetchEvent();
+      void refetchRegistrationCounts();
+    });
+
+    return () => {
+      eventService.unsubscribe(channel);
+    };
+  }, [queryClient, refetchEvent, refetchRegistrationCounts]);
   const userRegistration = registrations.find(
     (reg) => reg.event_id === eventId,
   );

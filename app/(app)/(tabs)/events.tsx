@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { useRef } from "react";
 import {
     Linking,
@@ -106,6 +106,18 @@ export default function EventsScreen() {
       }
     }, [refetchEvents, refetchRegistrations, refetchRegistrationCounts, refetchWinners, refetchInvites, userId])
   );
+
+  useEffect(() => {
+    const channel = eventService.subscribeToEvents(() => {
+      void queryClient.invalidateQueries({ queryKey: ["events"] });
+      void refetchEvents();
+      void refetchRegistrationCounts();
+    });
+
+    return () => {
+      eventService.unsubscribe(channel);
+    };
+  }, [queryClient, refetchEvents, refetchRegistrationCounts]);
 
   const [activePreviewModal, setActivePreviewModal] = useState<"image" | "pdf" | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
