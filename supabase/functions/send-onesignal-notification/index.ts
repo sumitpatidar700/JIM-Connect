@@ -94,7 +94,7 @@ serve(async (req) => {
       app_id: ONESIGNAL_APP_ID,
       headings: { en: title },
       contents: { en: message },
-      android_sound: "nil", // 'nil' tells OneSignal to use the default system notification sound channel
+      android_sound: "default", // Plays the default system notification sound channel
       ios_sound: "default",  // 'default' plays the standard iOS notification alert
     }
 

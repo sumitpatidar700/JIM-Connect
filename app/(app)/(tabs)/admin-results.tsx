@@ -229,6 +229,96 @@ export default function AdminResultsScreen() {
     });
   }, [winnerSections, publishedSearch, publishedSort]);
 
+  const isTeamEvent = (selectedEvent?.max_team_size ?? 1) > 1;
+
+  const registeredTeams = useMemo(() => {
+    if (!selectedEvent || !isTeamEvent) {
+      return [];
+    }
+
+    const teamsMap = new Map<string, {
+      teamId: string;
+      name: string;
+      leaderId: string;
+      members: { name: string; email: string; user_id: string }[];
+    }>();
+
+    const soloTeams: {
+      teamId: string;
+      name: string;
+      leaderId: string;
+      members: { name: string; email: string; user_id: string }[];
+    }[] = [];
+
+    registrations.forEach((reg) => {
+      if (reg.team_id && reg.event_teams) {
+        const existing = teamsMap.get(reg.team_id);
+        const memberInfo = {
+          name: reg.users?.name ?? "Student",
+          email: reg.users?.email ?? "No email",
+          user_id: reg.user_id,
+        };
+        if (existing) {
+          existing.members.push(memberInfo);
+        } else {
+          teamsMap.set(reg.team_id, {
+            teamId: reg.team_id,
+            name: reg.event_teams.name,
+            leaderId: reg.event_teams.leader_id,
+            members: [memberInfo],
+          });
+        }
+      } else {
+        const memberInfo = {
+          name: reg.users?.name ?? "Student",
+          email: reg.users?.email ?? "No email",
+          user_id: reg.user_id,
+        };
+        soloTeams.push({
+          teamId: `solo-${reg.id}`,
+          name: reg.users?.name ? `Team ${reg.users.name}` : "Solo Registrant",
+          leaderId: reg.user_id,
+          members: [memberInfo],
+        });
+      }
+    });
+
+    return [...Array.from(teamsMap.values()), ...soloTeams];
+  }, [registrations, selectedEvent, isTeamEvent]);
+
+  const filteredCandidateTeams = useMemo(() => {
+    const query = candidateSearch.trim().toLowerCase();
+    const draftedTeamIds = new Set(
+      draftWinners.map((winner) => (winner as any).teamId).filter(Boolean)
+    );
+    const publishedWinnerNames = new Set(
+      selectedEventWinners.map((w) => w.name.trim().toLowerCase())
+    );
+
+    return registeredTeams
+      .filter((team) => !draftedTeamIds.has(team.teamId))
+      .filter((team) => {
+        const teamNameLower = team.name.trim().toLowerCase();
+        
+        // Since group winner names are stored as "Team Name (Member 1, Member 2)",
+        // we check if any published winner starts with "team name (" or is an exact match.
+        const alreadyPublished = selectedEventWinners.some(
+          (w) => w.name.trim().toLowerCase().startsWith(`${teamNameLower} (`) || w.name.trim().toLowerCase() === teamNameLower
+        );
+        if (alreadyPublished) {
+          return false;
+        }
+
+        if (!query) {
+          return true;
+        }
+
+        const memberSearchStr = team.members.map(m => `${m.name} ${m.email}`).join(" ");
+        const searchable = `${team.name} ${memberSearchStr}`.toLowerCase();
+        return searchable.includes(query);
+      });
+  }, [candidateSearch, draftWinners, registeredTeams, selectedEventWinners]);
+
   const filteredCandidates = useMemo(() => {
     const query = candidateSearch.trim().toLowerCase();
     const draftedIds = new Set(draftWinners.map((winner) => winner.registrationId));
@@ -376,6 +466,32 @@ export default function AdminResultsScreen() {
     ]);
   };
 
+  const addDraftWinnerTeam = (team: typeof registeredTeams[number]) => {
+    if (draftWinners.some((winner) => (winner as any).teamId === team.teamId)) {
+      void showAlert({
+        message: "This group is already selected as a winner.",
+        title: "Duplicate Group",
+        tone: "warning",
+      });
+      return;
+    }
+
+    const membersString = team.members.map(m => m.name).join(", ");
+    const winnerName = `${team.name} (${membersString})`;
+
+    setDraftWinners((current) => [
+      ...current,
+      {
+        email: "",
+        name: winnerName,
+        position: `${current.length + 1}${getOrdinalSuffix(current.length + 1)} Place`,
+        registrationId: team.teamId,
+        userId: undefined,
+        teamId: team.teamId,
+      } as any,
+    ]);
+  };
+
   const updateDraftWinnerPosition = (registrationId: string, position: string) => {
     setDraftWinners((current) =>
       current.map((winner) =>
@@ -424,6 +540,17 @@ export default function AdminResultsScreen() {
       await showAlert({
         message: "A single student cannot be selected for multiple winning positions.",
         title: "Duplicate Winner Entry",
+        tone: "warning",
+      });
+      return;
+    }
+
+    const teamIds = draftWinners.map(w => (w as any).teamId).filter(Boolean);
+    const uniqueTeamIds = new Set(teamIds);
+    if (teamIds.length !== uniqueTeamIds.size) {
+      await showAlert({
+        message: "A single team/group cannot be selected for multiple winning positions.",
+        title: "Duplicate Group Entry",
         tone: "warning",
       });
       return;
@@ -841,8 +968,8 @@ export default function AdminResultsScreen() {
             <TextField
               autoCapitalize="none"
               autoCorrect={false}
-              label="Search registered students"
-              placeholder="Search name, email, or phone"
+              label={isTeamEvent ? "Search registered groups" : "Search registered students"}
+              placeholder={isTeamEvent ? "Search group name or member name" : "Search name, email, or phone"}
               value={candidateSearch}
               onChangeText={setCandidateSearch}
             />
@@ -856,7 +983,7 @@ export default function AdminResultsScreen() {
                       style={styles.draftWinnerText}
                     >
                       <Text style={styles.candidateName}>{winner.name}</Text>
-                      <Text style={styles.candidateMeta}>{winner.email || "No email"}</Text>
+                      <Text style={styles.candidateMeta}>{winner.email ? winner.email : "Group / Team Winner"}</Text>
                     </Pressable>
                     <View style={styles.positionInputWrap}>
                       <TextField
@@ -879,45 +1006,79 @@ export default function AdminResultsScreen() {
               </View>
             ) : null}
             <View style={styles.candidateList}>
-              {filteredCandidates.map((registration) => {
-                const candidateName =
-                  registration.users?.name ?? registration.users?.email ?? "Student";
-                const selected = draftWinners.some((winner) => winner.registrationId === registration.id);
+              {isTeamEvent ? (
+                filteredCandidateTeams.map((team) => {
+                  const selected = draftWinners.some((winner) => (winner as any).teamId === team.teamId);
+                  const memberNames = team.members.map(m => m.name).join(" • ");
+                  return (
+                    <View
+                      key={team.teamId}
+                      style={[
+                        styles.candidateCard,
+                        selected && {
+                          backgroundColor: themeColors.primarySoft,
+                          borderColor: themeColors.primary,
+                        },
+                      ]}
+                    >
+                      <View style={styles.candidateText}>
+                        <Text style={styles.candidateName}>{team.name}</Text>
+                        <Text style={styles.candidateMeta}>
+                          Members: {memberNames}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => addDraftWinnerTeam(team)}
+                        style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: radii.md, backgroundColor: selected ? themeColors.primary : themeColors.surfaceAlt }}
+                      >
+                        <Text style={[styles.selectText, { color: selected ? "#FFFFFF" : themeColors.primary }]}>
+                          {selected ? "Added" : "Add"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })
+              ) : (
+                filteredCandidates.map((registration) => {
+                  const candidateName =
+                    registration.users?.name ?? registration.users?.email ?? "Student";
+                  const selected = draftWinners.some((winner) => winner.registrationId === registration.id);
 
-                return (
-                  <View
-                    key={registration.id}
-                    style={[
-                      styles.candidateCard,
-                      selected && {
-                        backgroundColor: themeColors.primarySoft,
-                        borderColor: themeColors.primary,
-                      },
-                    ]}
-                  >
-                    <Pressable
-                      onPress={() => router.push(`/(app)/student-detail?userId=${registration.user_id}`)}
-                      style={styles.candidateText}
+                  return (
+                    <View
+                      key={registration.id}
+                      style={[
+                        styles.candidateCard,
+                        selected && {
+                          backgroundColor: themeColors.primarySoft,
+                          borderColor: themeColors.primary,
+                        },
+                      ]}
                     >
-                      <Text style={styles.candidateName}>{candidateName}</Text>
-                      <Text style={styles.candidateMeta}>
-                        {registration.users?.email ?? "No email"} • Registered {formatEventDate(registration.created_at)}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => addDraftWinner(registration)}
-                      style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: radii.md, backgroundColor: selected ? themeColors.primary : themeColors.surfaceAlt }}
-                    >
-                      <Text style={[styles.selectText, { color: selected ? "#FFFFFF" : themeColors.primary }]}>
-                        {selected ? "Added" : "Add"}
-                      </Text>
-                    </Pressable>
-                  </View>
-                );
-              })}
+                      <Pressable
+                        onPress={() => router.push(`/(app)/student-detail?userId=${registration.user_id}`)}
+                        style={styles.candidateText}
+                      >
+                        <Text style={styles.candidateName}>{candidateName}</Text>
+                        <Text style={styles.candidateMeta}>
+                          {registration.users?.email ?? "No email"} • Registered {formatEventDate(registration.created_at)}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => addDraftWinner(registration)}
+                        style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: radii.md, backgroundColor: selected ? themeColors.primary : themeColors.surfaceAlt }}
+                      >
+                        <Text style={[styles.selectText, { color: selected ? "#FFFFFF" : themeColors.primary }]}>
+                          {selected ? "Added" : "Add"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })
+              )}
             </View>
             <Text style={[styles.listMeta, { color: themeColors.muted }]}>
-              Showing {filteredCandidates.length} candidates. Use search for large registration lists.
+              Showing {isTeamEvent ? filteredCandidateTeams.length : filteredCandidates.length} candidates. Use search for large lists.
             </Text>
             {!canDeclareResults ? (
               <Text style={[styles.listMeta, { color: "#DC2626" }]}>
