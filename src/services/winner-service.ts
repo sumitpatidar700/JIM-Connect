@@ -47,7 +47,7 @@ export const winnerService = {
 
   async listWinners(batchId?: string | null): Promise<WinnerItem[]> {
     const activeSession = await sessionService.getActiveSession();
-    let query = supabase.from('winners').select('*, events(title, date, venue), users(name, avatar_url)');
+    let query = supabase.from('winners').select('*, events(title, date, venue, max_team_size), users(name, avatar_url)');
     
     if (activeSession) {
       query = query.eq('session_id', activeSession.id);

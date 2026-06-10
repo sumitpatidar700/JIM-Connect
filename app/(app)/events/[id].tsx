@@ -3,10 +3,11 @@ import { Image } from 'expo-image';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share, PanResponder } from 'react-native';
+import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share, PanResponder, ActivityIndicator } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '@/components/ui/BackButton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -44,6 +45,7 @@ export default function EventDetailsScreen() {
   const [inviting, setInviting] = useState(false);
   const [inviteeInput, setInviteeInput] = useState("");
   const [submittingInvite, setSubmittingInvite] = useState(false);
+  const [uploadingGroupImg, setUploadingGroupImg] = useState(false);
   const profile = useAuthStore((state) => state.profile);
   const userId = profile?.id;
   const isAdmin = profile?.role === 'admin';
@@ -207,6 +209,53 @@ export default function EventDetailsScreen() {
       });
     } finally {
       setSubmittingInvite(false);
+    }
+  };
+
+  const handleChooseGroupImage = async () => {
+    if (!userRegistration?.event_teams?.id) return;
+    try {
+      const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+      let permission = currentPermission;
+
+      if (!permission.granted && permission.canAskAgain) {
+        permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+
+      if (!permission.granted) {
+        await showAlert({
+          message: "Allow media access to pick a group profile image.",
+          title: "Permission needed",
+          tone: "warning",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        mediaTypes: ["images"],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        setUploadingGroupImg(true);
+        await eventService.updateTeamImage(userRegistration.event_teams.id, result.assets[0].uri);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.registeredEvents(userId) });
+        await showAlert({
+          title: "Group image updated",
+          message: "Your group profile image has been successfully updated!",
+          tone: "success",
+        });
+      }
+    } catch (error: any) {
+      await showAlert({
+        title: "Upload failed",
+        message: error?.message || "Could not upload group image.",
+        tone: "error",
+      });
+    } finally {
+      setUploadingGroupImg(false);
     }
   };
 
@@ -589,18 +638,54 @@ export default function EventDetailsScreen() {
         </Panel>
       ) : myTeamName ? (
         <Panel style={{ marginBottom: spacing.lg, backgroundColor: "#3B82F612", borderColor: "#3B82F635", borderWidth: 1, elevation: 0, shadowOpacity: 0 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <IconSymbol name="people-outline" size={20} color="#3B82F6" />
-              <Text style={{ fontSize: 16, fontFamily: typography.bold, color: themeColors.text }}>Your Group: {myTeamName}</Text>
-            </View>
-            <View style={{ backgroundColor: "#3B82F6", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
-              <Text style={{ fontSize: 11, color: "#fff", fontFamily: typography.semiBold }}>{isLeader ? "Leader" : "Member"}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <Pressable
+              disabled={!isLeader || uploadingGroupImg}
+              onPress={handleChooseGroupImage}
+              style={({ pressed }) => [
+                {
+                  position: "relative",
+                  width: 50,
+                  height: 50,
+                  borderRadius: 25,
+                  overflow: "hidden",
+                  backgroundColor: themeColors.primarySoft,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderColor: themeColors.border,
+                  borderWidth: 1,
+                },
+                pressed && { opacity: 0.8 }
+              ]}
+            >
+              {userRegistration?.event_teams?.image_url ? (
+                <Image source={{ uri: userRegistration.event_teams.image_url }} style={{ width: 50, height: 50 }} />
+              ) : (
+                <IconSymbol name="people-outline" size={24} color={themeColors.primary} />
+              )}
+              {isLeader && (
+                <View style={{ position: "absolute", bottom: 0, right: 0, left: 0, backgroundColor: "rgba(0,0,0,0.5)", height: 16, alignItems: "center", justifyContent: "center" }}>
+                  <IconSymbol name="camera" size={10} color="#fff" />
+                </View>
+              )}
+              {uploadingGroupImg && (
+                <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center" }}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              )}
+            </Pressable>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+                <Text style={{ fontSize: 16, fontFamily: typography.bold, color: themeColors.text }} numberOfLines={1}>Your Group: {myTeamName}</Text>
+                <View style={{ backgroundColor: "#3B82F6", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                  <Text style={{ fontSize: 11, color: "#fff", fontFamily: typography.semiBold }}>{isLeader ? "Leader" : "Member"}</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 13, color: themeColors.muted, fontFamily: typography.medium }}>
+                Status: <Text style={{ color: myStatus === 'accepted' ? '#10B981' : '#F59E0B', fontFamily: typography.semiBold, textTransform: 'capitalize' }}>{myStatus}</Text>
+              </Text>
             </View>
           </View>
-          <Text style={{ fontSize: 13, color: themeColors.muted, fontFamily: typography.medium }}>
-            Status: <Text style={{ color: myStatus === 'accepted' ? '#10B981' : '#F59E0B', fontFamily: typography.semiBold, textTransform: 'capitalize' }}>{myStatus}</Text>
-          </Text>
 
           {userRegistration?.event_teams?.registrations && userRegistration.event_teams.registrations.length > 0 ? (
             <View style={{ marginTop: 12, borderTopColor: themeColors.border, borderTopWidth: 1, paddingTop: 10, gap: 8 }}>

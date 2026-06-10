@@ -65,6 +65,7 @@ export default function ProfileScreen() {
   const [submittingInvite, setSubmittingInvite] = useState(false);
   const [rawImageUri, setRawImageUri] = useState("");
   const [showPhotoEditor, setShowPhotoEditor] = useState(false);
+  const [uploadingGroupImg, setUploadingGroupImg] = useState(false);
   const queryClient = useQueryClient();
   const setAuthState = useAuthStore((state) => state.setAuthState);
   const { data: registrations = [], isLoading } = useUserRegistrationsQuery(
@@ -201,6 +202,53 @@ export default function ProfileScreen() {
       });
     } finally {
       setSubmittingInvite(false);
+    }
+  };
+
+  const handleChooseGroupImage = async (teamId: string) => {
+    try {
+      const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+      let permission = currentPermission;
+
+      if (!permission.granted && permission.canAskAgain) {
+        permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+
+      if (!permission.granted) {
+        await showAlert({
+          message: "Allow media access to pick a group profile image.",
+          title: "Permission needed",
+          tone: "warning",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        mediaTypes: ["images"],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        setUploadingGroupImg(true);
+        await eventService.updateTeamImage(teamId, result.assets[0].uri);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.userRegistrations(profile?.id) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.registeredEvents(profile?.id) });
+        await showAlert({
+          title: "Group image updated",
+          message: "Your group profile image has been successfully updated!",
+          tone: "success",
+        });
+      }
+    } catch (error: any) {
+      await showAlert({
+        title: "Upload failed",
+        message: error?.message || "Could not upload group image.",
+        tone: "error",
+      });
+    } finally {
+      setUploadingGroupImg(false);
     }
   };
 
@@ -756,7 +804,11 @@ export default function ProfileScreen() {
                 >
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <View style={{ backgroundColor: "#3B82F620", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <IconSymbol name="people-outline" size={12} color="#3B82F6" />
+                      {registration.event_teams?.image_url ? (
+                        <Image source={{ uri: registration.event_teams.image_url! }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+                      ) : (
+                        <IconSymbol name="people-outline" size={12} color="#3B82F6" />
+                      )}
                       <Text style={{ fontSize: 11, color: "#3B82F6", fontFamily: typography.semiBold }}>Group: {registration.event_teams?.name}</Text>
                     </View>
                     {registration.status === 'pending' ? (
@@ -776,13 +828,56 @@ export default function ProfileScreen() {
                     <IconSymbol name={expandedTeamId === registration.event_teams?.id ? "chevron-up" : "chevron-down"} size={14} color={themeColors.primary} />
                   </View>
                 </Pressable>
-
+ 
                 {expandedTeamId === registration.event_teams?.id && registration.event_teams?.registrations ? (
                   <View style={{ marginTop: 8, gap: 8, padding: 12, borderRadius: 12, backgroundColor: themeColors.background, borderColor: themeColors.border, borderWidth: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8, borderBottomColor: themeColors.border, borderBottomWidth: 1, paddingBottom: 10 }}>
+                      <Pressable
+                        disabled={profile?.id !== registration.event_teams?.leader_id || uploadingGroupImg}
+                        onPress={() => registration.event_teams?.id && handleChooseGroupImage(registration.event_teams.id)}
+                        style={({ pressed }) => [
+                          {
+                            position: "relative",
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
+                            overflow: "hidden",
+                            backgroundColor: themeColors.primarySoft,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderColor: themeColors.border,
+                            borderWidth: 1,
+                          },
+                          pressed && { opacity: 0.8 }
+                        ]}
+                      >
+                        {registration.event_teams?.image_url ? (
+                          <Image source={{ uri: registration.event_teams.image_url! }} style={{ width: 44, height: 44 }} />
+                        ) : (
+                          <IconSymbol name="people-outline" size={20} color={themeColors.primary} />
+                        )}
+                        {profile?.id === registration.event_teams?.leader_id && (
+                          <View style={{ position: "absolute", bottom: 0, right: 0, left: 0, backgroundColor: "rgba(0,0,0,0.5)", height: 14, alignItems: "center", justifyContent: "center" }}>
+                            <IconSymbol name="camera" size={8} color="#fff" />
+                          </View>
+                        )}
+                        {uploadingGroupImg && (
+                          <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center" }}>
+                            <ActivityIndicator size="small" color="#fff" />
+                          </View>
+                        )}
+                      </Pressable>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: typography.bold, color: themeColors.text }} numberOfLines={1}>{registration.event_teams?.name}</Text>
+                        <Text style={{ fontSize: 11, fontFamily: typography.medium, color: themeColors.muted }}>
+                          {profile?.id === registration.event_teams?.leader_id ? "You are the Team Leader" : "Team Member"}
+                        </Text>
+                      </View>
+                    </View>
                     <Text style={{ fontSize: 12, fontFamily: typography.semiBold, color: themeColors.muted, marginBottom: 2 }}>
-                      Group Teammates ({registration.event_teams.registrations.length})
+                      Group Teammates ({registration.event_teams?.registrations?.length ?? 0})
                     </Text>
-                    {registration.event_teams.registrations.map((m, index) => {
+                    {registration.event_teams!.registrations.map((m, index) => {
                       const mName = m.users?.name || "Student";
                       const isLeader = m.user_id === registration.event_teams?.leader_id;
                       const isSelf = m.user_id === profile?.id;
@@ -825,12 +920,12 @@ export default function ProfileScreen() {
                       );
                     })}
 
-                    {profile?.id === registration.event_teams.leader_id && registration.events && (registration.events.max_team_size ?? 1) > registration.event_teams.registrations.length ? (
+                    {profile?.id === registration.event_teams?.leader_id && registration.events && (registration.events.max_team_size ?? 1) > (registration.event_teams?.registrations?.length ?? 0) ? (
                       <View style={{ marginTop: 8, borderTopColor: themeColors.border, borderTopWidth: 1, paddingTop: 10 }}>
-                        {invitingTeamId === registration.event_teams.id ? (
+                        {invitingTeamId === registration.event_teams?.id ? (
                           <View style={{ gap: 8 }}>
                             <Text style={{ fontSize: 12, fontFamily: typography.semiBold, color: themeColors.text }}>
-                              Invite Teammate ({registration.event_teams.registrations.length}/{registration.events.max_team_size} slots filled)
+                              Invite Teammate ({(registration.event_teams?.registrations?.length ?? 0)}/{registration.events.max_team_size} slots filled)
                             </Text>
                             <TextField
                               label="Student Email or Phone Number"
@@ -859,7 +954,7 @@ export default function ProfileScreen() {
                         ) : (
                           <View style={{ gap: 10 }}>
                             <PrimaryButton
-                              label={`+ Select Teammate from Directory (${(registration.events.max_team_size ?? 1) - registration.event_teams.registrations.length} available)`}
+                              label={`+ Select Teammate from Directory (${(registration.events.max_team_size ?? 1) - (registration.event_teams?.registrations?.length ?? 0)} available)`}
                               onPress={() => setShowDirectoryModalForTeam({
                                 eventId: registration.event_id,
                                 teamId: registration.event_teams!.id,

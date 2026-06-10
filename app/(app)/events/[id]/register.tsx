@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -41,6 +42,7 @@ export default function RegistrationScreen() {
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<UserProfile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [groupImageUri, setGroupImageUri] = useState<string | null>(null);
 
   const eventId = id ?? '';
   const { data: event = null, isLoading: loading } = useEventByIdQuery(eventId);
@@ -98,6 +100,43 @@ export default function RegistrationScreen() {
     setSelectedStudents(selectedStudents.filter(s => s.id !== studentId));
   };
 
+  const handleChooseGroupImage = async () => {
+    try {
+      const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+      let permission = currentPermission;
+
+      if (!permission.granted && permission.canAskAgain) {
+        permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+
+      if (!permission.granted) {
+        await showAlert({
+          message: "Allow media access to pick a group profile image.",
+          title: "Permission needed",
+          tone: "warning",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        mediaTypes: ["images"],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        setGroupImageUri(result.assets[0].uri);
+      }
+    } catch (error: any) {
+      await showAlert({
+        title: "Selection failed",
+        message: error?.message || "Could not select group image.",
+        tone: "error",
+      });
+    }
+  };
+
   const availableStudents = allUsers.filter(u => {
     if (u.id === userId || u.role === 'admin' || selectedStudents.some(s => s.id === u.id)) {
       return false;
@@ -147,7 +186,7 @@ export default function RegistrationScreen() {
           ...invites.filter(val => val.trim()),
           ...selectedStudents.map(s => s.id)
         ];
-        await eventService.registerTeamForEvent(userId, eventId, teamName, normalizedPhone, allInvitedIdsOrPhones);
+        await eventService.registerTeamForEvent(userId, eventId, teamName, normalizedPhone, allInvitedIdsOrPhones, groupImageUri);
       } else {
         await eventService.registerForEvent(userId, eventId, normalizedPhone);
       }
@@ -253,6 +292,50 @@ export default function RegistrationScreen() {
             value={teamName}
             onChangeText={setTeamName}
           />
+
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginTop: 12, marginBottom: 12 }}>
+            {groupImageUri ? (
+              <Image source={{ uri: groupImageUri }} style={{ width: 64, height: 64, borderRadius: 32 }} />
+            ) : (
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: themeColors.primarySoft, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: themeColors.border }}>
+                <IconSymbol name="photo" size={32} color={themeColors.primary} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontFamily: typography.semiBold, color: themeColors.text }}>Group Photo (Optional)</Text>
+              <Text style={{ fontSize: 12, color: themeColors.muted, marginTop: 2, marginBottom: 6 }}>Represent your team with a custom picture.</Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  onPress={handleChooseGroupImage}
+                  style={{
+                    backgroundColor: themeColors.primarySoft,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: themeColors.primary + "30",
+                  }}
+                >
+                  <Text style={{ color: themeColors.primary, fontSize: 12, fontFamily: typography.semiBold }}>
+                    {groupImageUri ? "Change Photo" : "Upload Photo"}
+                  </Text>
+                </TouchableOpacity>
+                {groupImageUri && (
+                  <TouchableOpacity
+                    onPress={() => setGroupImageUri(null)}
+                    style={{
+                      backgroundColor: "transparent",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text style={{ color: "#EF4444", fontSize: 12, fontFamily: typography.semiBold }}>Remove</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
 
           <Text style={[styles.meta, { marginTop: 16, marginBottom: 8, color: themeColors.muted }]}>
             Team Members ({currentTeamSize} / {event.max_team_size})

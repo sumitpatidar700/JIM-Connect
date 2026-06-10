@@ -14,7 +14,6 @@ export function useUpcomingEventsQuery(limit = 6) {
   return useQuery({
     queryFn: () => eventService.listUpcomingEvents({ limit, batchId }),
     queryKey: queryKeys.upcomingEvents(limit, batchId),
-    staleTime: 1000 * 10,
-    refetchInterval: 5000,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

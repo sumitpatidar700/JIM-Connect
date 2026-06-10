@@ -496,7 +496,7 @@ export default function AdminDashboardScreen() {
                   ]}
                 >
                   <IconSymbol
-                    color={themeColors.text}
+                    color="#FFFFFF"
                     name={item.icon as any}
                     size={20}
                   />

@@ -15,7 +15,6 @@ export function useAnnouncementsQuery() {
   return useQuery({
     queryFn: () => announcementService.listAnnouncements(batchId),
     queryKey: queryKeys.announcements(batchId),
-    staleTime: 1000 * 10,
-    refetchInterval: 5000,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }

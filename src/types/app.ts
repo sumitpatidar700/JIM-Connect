@@ -59,6 +59,7 @@ export type EventTeam = {
   name: string;
   leader_id: string;
   created_at: string;
+  image_url?: string | null;
   registrations?: {
     id: string;
     user_id: string;

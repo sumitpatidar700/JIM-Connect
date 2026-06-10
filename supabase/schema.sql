@@ -291,6 +291,7 @@ create table if not exists public.event_teams (
   name text not null,
   leader_id uuid not null references public.users (id) on delete cascade,
   created_at timestamptz not null default now(),
+  image_url text,
   unique(event_id, name)
 );
 
@@ -436,3 +437,23 @@ create policy "sessions_admin_manage"
 on public.sessions for all
 using (public.is_admin())
 with check (public.is_admin());
+
+-- Performance indexes for registrations lookup
+create index if not exists idx_registrations_event_id on public.registrations(event_id);
+create index if not exists idx_registrations_user_id on public.registrations(user_id);
+create index if not exists idx_registrations_status on public.registrations(status);
+create index if not exists idx_registrations_team_id on public.registrations(team_id);
+
+-- Indexes for event teams lookup
+create index if not exists idx_event_teams_event_id on public.event_teams(event_id);
+create index if not exists idx_event_teams_leader_id on public.event_teams(leader_id);
+
+-- Indexes for users role filtering and batch filtering
+create index if not exists idx_users_role on public.users(role);
+create index if not exists idx_users_batch_id on public.users(batch_id);
+
+-- Indexes for batch filtering on entities
+create index if not exists idx_events_batch_id on public.events(batch_id);
+create index if not exists idx_announcements_batch_id on public.announcements(batch_id);
+create index if not exists idx_winners_batch_id on public.winners(batch_id);
+

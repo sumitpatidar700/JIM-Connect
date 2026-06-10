@@ -21,7 +21,6 @@ export function useEventSearchQuery(query: string, options?: { committees?: stri
     placeholderData: keepPreviousData,
     queryFn: () => eventService.searchEvents(normalizedQuery, searchOptions),
     queryKey: queryKeys.eventSearch(normalizedQuery, searchOptions),
-    staleTime: 1000 * 10,
-    refetchInterval: 5000,
+    staleTime: 1000 * 60, // 1 minute
   });
 }

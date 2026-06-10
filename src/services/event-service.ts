@@ -165,7 +165,7 @@ export const eventService = {
   async listRegisteredEvents(userId: string): Promise<EventRegistration[]> {
     const { data, error } = await supabase
       .from('registrations')
-      .select('*, inviter:users!registrations_invited_by_fkey(name, email, avatar_url, phone), event_teams(id, name, leader_id, registrations(id, user_id, status, users!registrations_user_id_fkey(name, avatar_url, email)))')
+      .select('*, inviter:users!registrations_invited_by_fkey(name, email, avatar_url, phone), event_teams(id, name, leader_id, image_url, registrations(id, user_id, status, users!registrations_user_id_fkey(name, avatar_url, email)))')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (error) {
@@ -188,7 +188,7 @@ export const eventService = {
   async listRegistrationsForEvent(eventId: string): Promise<EventRegistrationWithUser[]> {
     const { data, error } = await supabase
       .from('registrations')
-      .select('*, users!registrations_user_id_fkey(name, email, avatar_url, phone), event_teams(id, name, leader_id)')
+      .select('*, users!registrations_user_id_fkey(name, email, avatar_url, phone), event_teams(id, name, leader_id, image_url)')
       .eq('event_id', eventId)
       .order('created_at', { ascending: false });
     if (error) {
@@ -265,7 +265,7 @@ export const eventService = {
   async listUserRegistrationsDetailed(userId: string): Promise<EventRegistrationWithEvent[]> {
     const { data, error } = await supabase
       .from('registrations')
-      .select('*, inviter:users!registrations_invited_by_fkey(name, email, avatar_url, phone), events(title, date, venue, max_team_size), event_teams(id, name, leader_id, registrations(id, user_id, status, users!registrations_user_id_fkey(name, avatar_url, email)))')
+      .select('*, inviter:users!registrations_invited_by_fkey(name, email, avatar_url, phone), events(title, date, venue, max_team_size), event_teams(id, name, leader_id, image_url, registrations(id, user_id, status, users!registrations_user_id_fkey(name, avatar_url, email)))')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (error) {
@@ -311,7 +311,7 @@ export const eventService = {
     }
   },
 
-  async registerTeamForEvent(userId: string, eventId: string, teamName: string, leaderPhone: string, invitedEmailsOrPhones: string[]) {
+  async registerTeamForEvent(userId: string, eventId: string, teamName: string, leaderPhone: string, invitedEmailsOrPhones: string[], groupImageUri?: string | null) {
     const normalizedPhone = leaderPhone.replace(/\D/g, '');
     if (normalizedPhone.length !== 10) {
       throw new Error('Enter a valid 10 digit phone number.');
@@ -336,10 +336,15 @@ export const eventService = {
       throw new Error('Registration has closed for this event.');
     }
 
+    let imageUrl: string | null = null;
+    if (groupImageUri) {
+      imageUrl = await storageService.uploadImage('profile-assets', 'teams', groupImageUri);
+    }
+
     // Insert team
     const { data: team, error: teamError } = await supabase
       .from('event_teams')
-      .insert({ event_id: eventId, name: teamName.trim(), leader_id: userId })
+      .insert({ event_id: eventId, name: teamName.trim(), leader_id: userId, image_url: imageUrl })
       .select()
       .single();
 
@@ -389,7 +394,7 @@ export const eventService = {
   async listPendingInvites(userId: string) {
     const { data, error } = await supabase
       .from('registrations')
-      .select('*, events(title, date, venue), event_teams(id, name, leader_id, registrations(id, user_id, status, users!registrations_user_id_fkey(name, avatar_url, email))), inviter:users!registrations_invited_by_fkey(name, email, avatar_url, phone)')
+      .select('*, events(title, date, venue), event_teams(id, name, leader_id, image_url, registrations(id, user_id, status, users!registrations_user_id_fkey(name, avatar_url, email))), inviter:users!registrations_invited_by_fkey(name, email, avatar_url, phone)')
       .eq('user_id', userId)
       .eq('status', 'pending');
 
@@ -555,5 +560,16 @@ export const eventService = {
     if (error) {
       throw error;
     }
+  },
+
+  async updateTeamImage(teamId: string, imageUri: string) {
+    const imageUrl = await storageService.uploadImage('profile-assets', 'teams', imageUri);
+    if (!imageUrl) throw new Error('Failed to upload image.');
+    const { error } = await supabase
+      .from('event_teams')
+      .update({ image_url: imageUrl })
+      .eq('id', teamId);
+    if (error) throw error;
+    return imageUrl;
   },
 };

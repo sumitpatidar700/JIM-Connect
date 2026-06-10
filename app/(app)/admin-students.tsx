@@ -7,7 +7,8 @@ import {
   TextInput,
   Image,
   Linking,
-  ScrollView
+  FlatList,
+  Platform
 } from "react-native";
 import { useMemo, useState, useDeferredValue } from "react";
 import { useRouter } from "expo-router";
@@ -61,19 +62,7 @@ export default function AdminStudentsScreen() {
   }
 
   return (
-    <Screen 
-      scrollable
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          tintColor={themeColors.primary}
-          onRefresh={() => {
-            setRefreshing(true);
-            void refetch().finally(() => setRefreshing(false));
-          }}
-        />
-      }
-    >
+    <Screen>
       <View style={styles.headerRow}>
         <TouchableOpacity 
           activeOpacity={0.7} 
@@ -130,90 +119,108 @@ export default function AdminStudentsScreen() {
         </TouchableOpacity>
       </View>
 
-      {filteredUsers.length === 0 ? (
-        <EmptyState
-          message={searchQuery ? "No students found matching your search." : "No students have registered yet."}
-          title={searchQuery ? "No matches" : "Empty Directory"}
-        />
-      ) : (
-        <View style={styles.listContainer}>
-          {filteredUsers.map((user) => (
-            <Panel key={user.id} style={styles.studentCard}>
-              <View style={styles.cardMain}>
-                <View style={[styles.avatarBox, { backgroundColor: themeColors.surfaceAlt }]}>
-                  {user.avatar_url ? (
-                    <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-                  ) : (
-                    <Text style={[styles.avatarText, { color: themeColors.text }]}>
-                      {user.name.charAt(0).toUpperCase()}
-                    </Text>
+      <FlatList
+        data={filteredUsers}
+        keyExtractor={(user) => user.id}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ gap: 12, paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={themeColors.primary}
+            onRefresh={() => {
+              setRefreshing(true);
+              void refetch().finally(() => setRefreshing(false));
+            }}
+          />
+        }
+        ListEmptyComponent={
+          <EmptyState
+            message={searchQuery ? "No students found matching your search." : "No students have registered yet."}
+            title={searchQuery ? "No matches" : "Empty Directory"}
+          />
+        }
+        renderItem={({ item: user }) => (
+          <Panel key={user.id} style={styles.studentCard}>
+            <View style={styles.cardMain}>
+              <View style={[styles.avatarBox, { backgroundColor: themeColors.surfaceAlt }]}>
+                {user.avatar_url ? (
+                  <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <Text style={[styles.avatarText, { color: themeColors.text }]}>
+                    {user.name.charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.studentInfo}>
+                <Text style={[styles.studentName, { color: themeColors.text }]}>
+                  {user.name}
+                </Text>
+                <Text style={[styles.studentEmail, { color: themeColors.muted }]}>
+                  {user.email}
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                  {user.batch_name && (
+                    <View style={{ backgroundColor: `${themeColors.primary}15`, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                      <Text style={{ fontSize: 10, fontFamily: typography.semiBold, color: themeColors.primary }}>
+                        {user.batch_name}
+                      </Text>
+                    </View>
+                  )}
+                  {user.phone && (
+                    <View style={styles.phoneRow}>
+                      <IconSymbol color={themeColors.muted} name="paperplane.fill" size={12} />
+                      <Text style={[styles.studentPhone, { color: themeColors.muted }]}>
+                        {user.phone}
+                      </Text>
+                    </View>
                   )}
                 </View>
-                <View style={styles.studentInfo}>
-                  <Text style={[styles.studentName, { color: themeColors.text }]}>
-                    {user.name}
-                  </Text>
-                  <Text style={[styles.studentEmail, { color: themeColors.muted }]}>
-                    {user.email}
-                  </Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                    {user.batch_name && (
-                      <View style={{ backgroundColor: `${themeColors.primary}15`, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                        <Text style={{ fontSize: 10, fontFamily: typography.semiBold, color: themeColors.primary }}>
-                          {user.batch_name}
-                        </Text>
-                      </View>
-                    )}
-                    {user.phone && (
-                      <View style={styles.phoneRow}>
-                        <IconSymbol color={themeColors.muted} name="paperplane.fill" size={12} />
-                        <Text style={[styles.studentPhone, { color: themeColors.muted }]}>
-                          {user.phone}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
               </View>
+            </View>
 
-              <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
+            <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
 
-              <View style={styles.cardActions}>
+            <View style={styles.cardActions}>
+              <TouchableOpacity 
+                onPress={() => handleEmail(user.email)}
+                style={[styles.actionButton, { backgroundColor: themeColors.surfaceAlt }]}
+              >
+                <IconSymbol color={themeColors.primary} name="paperplane.fill" size={14} />
+                <Text style={[styles.actionText, { color: themeColors.primary }]}>Email</Text>
+              </TouchableOpacity>
+              
+              {user.phone && (
                 <TouchableOpacity 
-                  onPress={() => handleEmail(user.email)}
+                  onPress={() => handleCall(user.phone)}
                   style={[styles.actionButton, { backgroundColor: themeColors.surfaceAlt }]}
                 >
-                  <IconSymbol color={themeColors.primary} name="paperplane.fill" size={14} />
-                  <Text style={[styles.actionText, { color: themeColors.primary }]}>Email</Text>
+                  <IconSymbol color={themeColors.primary} name="checkmark" size={14} />
+                  <Text style={[styles.actionText, { color: themeColors.primary }]}>Call</Text>
                 </TouchableOpacity>
-                
-                {user.phone && (
-                  <TouchableOpacity 
-                    onPress={() => handleCall(user.phone)}
-                    style={[styles.actionButton, { backgroundColor: themeColors.surfaceAlt }]}
-                  >
-                    <IconSymbol color={themeColors.primary} name="checkmark" size={14} />
-                    <Text style={[styles.actionText, { color: themeColors.primary }]}>Call</Text>
-                  </TouchableOpacity>
-                )}
+              )}
 
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(app)/student-detail",
-                      params: { userId: user.id },
-                    })
-                  }
-                  style={[styles.actionButton, { backgroundColor: themeColors.surfaceAlt }]}
-                >
-                  <IconSymbol color={themeColors.text} name="chevron.right" size={14} />
-                  <Text style={[styles.actionText, { color: themeColors.text }]}>View</Text>
-                </TouchableOpacity>
-              </View>
-            </Panel>
-          ))}
-        </View>
-      )}
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/student-detail",
+                    params: { userId: user.id },
+                  })
+                }
+                style={[styles.actionButton, { backgroundColor: themeColors.surfaceAlt }]}
+              >
+                <IconSymbol color={themeColors.text} name="chevron.right" size={14} />
+                <Text style={[styles.actionText, { color: themeColors.text }]}>View</Text>
+              </TouchableOpacity>
+            </View>
+          </Panel>
+        )}
+      />
     </Screen>
   );
 }

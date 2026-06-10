@@ -87,11 +87,11 @@ export default function EventRegistrationsScreen() {
   }, [registrationSearch, registrationSort, registrations]);
 
   const groupsMap = useMemo(() => {
-    const map: Record<string, { teamName: string; leaderId?: string; registrations: typeof registrations }> = {};
+    const map: Record<string, { teamName: string; leaderId?: string; imageUrl?: string | null; registrations: typeof registrations }> = {};
     visibleRegistrations.forEach(r => {
       const tName = r.event_teams?.name || 'Individual / Unassigned';
       if (!map[tName]) {
-        map[tName] = { teamName: tName, leaderId: r.event_teams?.leader_id, registrations: [] };
+        map[tName] = { teamName: tName, leaderId: r.event_teams?.leader_id, imageUrl: r.event_teams?.image_url, registrations: [] };
       }
       map[tName].registrations.push(r);
     });
@@ -300,19 +300,82 @@ export default function EventRegistrationsScreen() {
             return (
               <Panel key={g.teamName} style={{ borderColor: isExpanded ? themeColors.primary : themeColors.border, borderWidth: 1 }}>
                 <Pressable onPress={() => setSelectedGroup(isExpanded ? null : g.teamName)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: typography.bold, fontSize: 18, color: themeColors.text }}>{g.teamName}</Text>
-                    <Text style={{ fontFamily: typography.medium, fontSize: 13, color: themeColors.muted, marginTop: 4 }}>
-                      {g.registrations.length} total members ({accCount} Accepted, {pendCount} Pending)
-                    </Text>
-                    {leader ? (
-                      <Text style={{ fontFamily: typography.regular, fontSize: 13, color: themeColors.primary, marginTop: 2 }}>
-                        Leader: {leader.name}
+                  <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    {g.imageUrl ? (
+                      <Image source={{ uri: g.imageUrl }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                    ) : (
+                      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: themeColors.primarySoft, alignItems: "center", justifyContent: "center" }}>
+                        <IconSymbol name="people-outline" size={22} color={themeColors.primary} />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: typography.bold, fontSize: 17, color: themeColors.text }}>{g.teamName}</Text>
+                      <Text style={{ fontFamily: typography.medium, fontSize: 13, color: themeColors.muted, marginTop: 2 }}>
+                        {g.registrations.length} total members ({accCount} Accepted, {pendCount} Pending)
                       </Text>
-                    ) : null}
+                      {leader ? (
+                        <Text style={{ fontFamily: typography.regular, fontSize: 13, color: themeColors.primary, marginTop: 2 }}>
+                          Leader: {leader.name}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
-                  <View style={{ backgroundColor: themeColors.primarySoft, padding: 8, borderRadius: radii.round, marginLeft: 12 }}>
-                    <IconSymbol name={isExpanded ? "arrow-up" : "arrow-down"} size={20} color={themeColors.primary} />
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      {g.registrations.slice(0, 3).map((reg, idx) => {
+                        const name = reg.users?.name ?? 'Student';
+                        const avatarUrl = reg.users?.avatar_url;
+                        return (
+                          <View
+                            key={reg.id}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 14,
+                              borderWidth: 1.5,
+                              borderColor: themeColors.surface,
+                              backgroundColor: themeColors.primarySoft,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginLeft: idx > 0 ? -12 : 0,
+                              zIndex: 10 - idx,
+                              overflow: "hidden",
+                            }}
+                          >
+                            {avatarUrl ? (
+                              <Image source={{ uri: avatarUrl }} style={{ width: "100%", height: "100%" }} />
+                            ) : (
+                              <Text style={{ fontSize: 10, fontFamily: typography.semiBold, color: themeColors.primary }}>
+                                {name.charAt(0).toUpperCase()}
+                              </Text>
+                            )}
+                          </View>
+                        );
+                      })}
+                      {g.registrations.length > 3 && (
+                        <View
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 14,
+                            borderWidth: 1.5,
+                            borderColor: themeColors.surface,
+                            backgroundColor: themeColors.surfaceAlt,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginLeft: -12,
+                            zIndex: 7,
+                          }}
+                        >
+                          <Text style={{ fontSize: 10, fontFamily: typography.bold, color: themeColors.text }}>
+                            +{g.registrations.length - 3}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={{ backgroundColor: themeColors.primarySoft, padding: 8, borderRadius: radii.round, marginLeft: 4 }}>
+                      <IconSymbol name={isExpanded ? "arrow-up" : "arrow-down"} size={20} color={themeColors.primary} />
+                    </View>
                   </View>
                 </Pressable>
 
